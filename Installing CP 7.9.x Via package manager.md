@@ -60,19 +60,71 @@ confluent.metadata.server.listeners=http://0.0.0.0:9644
 # Advertised listeners for metadata server
 confluent.metadata.server.advertised.listeners=http://127.0.0.1:9644
 ```
+
 3. Navigate to the Schema Registry properties file (/etc/schema-registry/schema-registry.properties) and specify the following properties:
 ```
 # Specify the address the socket server listens on, e.g. listeners = PLAINTEXT://your.host.name:9092
-listeners=http://0.0.0.0:8081
+listeners=http://0.0.0.0:8085 #default 8081
 
 # The host name advertised in ZooKeeper. This must be specified if your running Schema Registry
 # with multiple nodes.
-host.name=192.168.50.1
+host.name=localhost
 
 # List of Kafka brokers to connect to, e.g. PLAINTEXT://hostname:9092,SSL://hostname2:9092
-kafkastore.bootstrap.servers=PLAINTEXT://localhost:9092,SSL://hostname2:9092
+kafkastore.bootstrap.servers=PLAINTEXT://localhost:9092
 ```
-4.  
+
+4.  Kafka Connect /etc/kafka/connect-distributed.properties
+```
+rest.port=8083
+rest.advertised.host.name=localhost
+rest.advertised.port=8083
+plugin.path=/usr/share/java
+```
+
+5.  Kafka Rest /etc/kafka-rest/kafka-rest.properties
+```
+id=kafka-rest-test-server
+bootstrap.servers=PLAINTEXT://localhost:9092
+# ZooKeeper (optional)
+zookeeper.connect=localhost:2181
+# Schema Registry
+schema.registry.url=http://localhost:8085
+# REST Proxy port
+listeners=http://0.0.0.0:8090
+```
+
+6.  ksqlDB /etc/ksqldb/ksql-server.properties
+```
+listeners=http://0.0.0.0:8088
+rest.advertised.listener=http://localhost:8088
+bootstrap.servers=localhost:9092
+ksql.connect.url=http://localhost:8083
+ksql.schema.registry.url=http://localhost:8085
+# ksql.schema.registry.url=http://localhost:8081 (default)
+state.dir=/var/lib/kafka-streams
+```
+
+7.  C3 (Confluent control center)
+   - ubah env c3 dari env prod ke env dev agar tidak perlu ada lisensi
+   ```
+     sudo nano /usr/lib/systemd/system/confluent-control-center.service
+   ```
+   - Reload systemd
+   ```
+   sudo systemctl daemon-reload
+   ```
+   - ubah config env dev: /etc/confluent-control-center/control-center-dev.properties
+   ```
+   bootstrap.servers=localhost:9092
+   zookeeper.connect=localhost:2181
+   confluent.controlcenter.id=1
+   confluent.controlcenter.connect.connect-default.cluster=http://localhost:8083
+   confluent.controlcenter.ksql.ksqlDB.url=http://localhost:8088
+   confluent.controlcenter.schema.registry.url=http://localhost:8085
+   confluent.controlcenter.streams.cprest.url=http://localhost:8090
+   ```
+   - 
 
 
 
