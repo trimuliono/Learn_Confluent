@@ -124,7 +124,61 @@ state.dir=/var/lib/kafka-streams
    confluent.controlcenter.schema.registry.url=http://localhost:8085
    confluent.controlcenter.streams.cprest.url=http://localhost:8090
    ```
-   - 
+---
+
+### Running CP Services (zookeeper, kafka, schema registry, kafka connect, ksqldb, kafka rest, C3)
+
+1. Running zookeeper
+```
+sudo systemctl start confluent-zookeeper
+sudo systemctl status confluent-zookeeper
+```
+<img width="1905" height="599" alt="image" src="https://github.com/user-attachments/assets/7528abf3-3450-4ab5-a7ee-8d9bd72b30c1" />
+
+2. Running Kafka (broker)
+```
+sudo systemctl start confluent-server
+sudo systemctl status confluent-server
+```
+<img width="1907" height="625" alt="image" src="https://github.com/user-attachments/assets/d289e512-851b-4078-9fb6-06016b3660dc" />
+
+3. Running Schema Registry
+```
+sudo systemctl start confluent-schema-registry
+sudo systemctl status confluent-schema-registry
+```
+<img width="1903" height="725" alt="image" src="https://github.com/user-attachments/assets/21a02b65-7710-440e-9f6c-ec7d073a1dec" />
+
+4. Running Kafka Connect
+```
+sudo systemctl start confluent-kafka-connect
+sudo systemctl status confluent-kafka-connect
+```
+<img width="1919" height="761" alt="image" src="https://github.com/user-attachments/assets/b15d6820-df79-497c-a1f7-1830ff1c0f65" />
+
+5. Running ksqlDB
+```
+sudo systemctl start confluent-ksqldb
+sudo systemctl status confluent-ksqldb
+```
+<img width="1909" height="618" alt="image" src="https://github.com/user-attachments/assets/4d159712-2071-4f9e-8f68-bcd5c0ce9341" />
+
+6. Running Kafka Rest
+```
+sudo systemctl start confluent-kafka-rest
+sudo systemctl status confluent-kafka-rest
+```
+<img width="1919" height="751" alt="image" src="https://github.com/user-attachments/assets/1048ded2-2ece-469d-b811-2ee67cf0130e" />
+
+7. Running Confluent control center (C3)
+```
+sudo systemctl start confluent-control-center
+sudo systemctl status confluent-control-center
+```
+<img width="1909" height="735" alt="image" src="https://github.com/user-attachments/assets/c49d7b75-aa49-44a4-b54f-4985f068beeb" />
+
+<img width="1491" height="941" alt="image" src="https://github.com/user-attachments/assets/bf039de3-0072-44fe-b0f4-125b03ed06c1" />
+
 
 
 
