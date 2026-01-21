@@ -179,6 +179,60 @@ sudo systemctl status confluent-control-center
 
 <img width="1491" height="941" alt="image" src="https://github.com/user-attachments/assets/bf039de3-0072-44fe-b0f4-125b03ed06c1" />
 
+---
+
+## Testing Create Topic, Produce dan Consume Data via CLI
+
+1. Create Topic
+```
+kafka-topics --create \
+  --topic e2e-test \
+  --partitions 3 \
+  --replication-factor 1 \
+  --bootstrap-server localhost:9092
+```
+<img width="981" height="184" alt="image" src="https://github.com/user-attachments/assets/72d771b9-3b98-40c7-925d-99af35cd4f54" />
+
+- Verify
+```
+kafka-topics --describe --topic e2e-test --bootstrap-server localhost:9092
+```
+<img width="1841" height="397" alt="image" src="https://github.com/user-attachments/assets/545777ac-cbdb-410a-ba19-d96d582136ff" />
+
+2. Produce Data
+```
+kafka-console-producer \
+  --topic e2e-test \
+  --bootstrap-server localhost:9092
+
+# Send messages:
+Message 1
+Message 2
+Message 3
+(Ctrl+C to stop - jangan close)
+```
+<img width="1047" height="264" alt="image" src="https://github.com/user-attachments/assets/8a367ef1-a918-4fb2-a699-5860be9f8498" />
+
+3. Consume Data
+```
+kafka-console-consumer \
+  --topic e2e-test \
+  --bootstrap-server localhost:9092 \
+  --from-beginning \
+  --group test-group-1
+
+# Output: 
+# Message 1
+# Message 2
+# Message 3
+```
+<img width="960" height="318" alt="image" src="https://github.com/user-attachments/assets/4e5f43a4-7dff-4179-9025-db142c981abf" />
+
+**Monitoring dari C3**
+<img width="1898" height="927" alt="image" src="https://github.com/user-attachments/assets/989bf7a9-2214-4033-b298-4c9126ae4bf2" />
+
+
+
 
 
 
