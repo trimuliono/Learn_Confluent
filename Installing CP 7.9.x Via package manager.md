@@ -231,7 +231,88 @@ kafka-console-consumer \
 **Monitoring dari C3**
 <img width="1898" height="927" alt="image" src="https://github.com/user-attachments/assets/989bf7a9-2214-4033-b298-4c9126ae4bf2" />
 
+---
 
+## Pengecekan Zookeeper Quorum dan Kafka cluster id
+
+Sebelumnya kita setup zookeper dengan single node karena memang testing dalam single server (wsl2 - ubuntu 24), sekarang kita coba scaling 3 node dalam single server dengan cara menerapkan setup port berbeda untuk masing-masing zookeeper.
+
+1. Matikan semua service confluent
+```
+sudo systemctl stop confluent-zookeeper
+sudo systemctl stop confluent-server
+sudo systemctl stop confluent-schema-registry
+sudo systemctl stop confluent-kafka-connect
+sudo systemctl stop confluent-kafka-rest
+sudo systemctl stop confluent-ksqldb
+sudo systemctl stop confluent-control-center
+```
+2. Setup 3 ZK directories + myid + configs
+```
+# Buat 3 folder
+sudo mkdir -p /var/lib/zookeeper{1,2,3}
+sudo chown cp-kafka:confluent /var/lib/zookeeper{1,2,3}
+
+# Create myid files
+echo "1" | sudo tee /var/lib/zookeeper1/myid
+echo "2" | sudo tee /var/lib/zookeeper2/myid
+echo "3" | sudo tee /var/lib/zookeeper3/myid
+
+# Create 3 config files
+sudo tee /etc/kafka/zookeeper1.properties << 'EOF'
+dataDir=/var/lib/zookeeper1
+clientPort=2181
+tickTime=2000
+initLimit=5
+syncLimit=2
+autopurge.snapRetainCount=3
+autopurge.purgeInterval=1
+server.1=localhost:2888:3888
+server.2=localhost:2889:3889
+server.3=localhost:2890:3890
+EOF
+
+sudo tee /etc/kafka/zookeeper2.properties << 'EOF'
+dataDir=/var/lib/zookeeper2
+clientPort=2182
+tickTime=2000
+initLimit=5
+syncLimit=2
+autopurge.snapRetainCount=3
+autopurge.purgeInterval=1
+server.1=localhost:2888:3888
+server.2=localhost:2889:3889
+server.3=localhost:2890:3890
+EOF
+
+sudo tee /etc/kafka/zookeeper3.properties << 'EOF'
+dataDir=/var/lib/zookeeper3
+clientPort=2183
+tickTime=2000
+initLimit=5
+syncLimit=2
+autopurge.snapRetainCount=3
+autopurge.purgeInterval=1
+server.1=localhost:2888:3888
+server.2=localhost:2889:3889
+server.3=localhost:2890:3890
+EOF
+```
+
+3. Start ZK1, ZK2, ZK3 (tunggu fully started)
+```
+sudo /usr/bin/zookeeper-server-start /etc/kafka/zookeeper1.properties
+sudo /usr/bin/zookeeper-server-start /etc/kafka/zookeeper2.properties
+sudo /usr/bin/zookeeper-server-start /etc/kafka/zookeeper3.properties
+```
+
+4. Update Kafka config (zookeeper.connect string)
+```
+sudo sed -i 's/zookeeper.connect=.*/zookeeper.connect=localhost:2181,localhost:2182,localhost:2183/' \
+  /etc/kafka/server.properties
+```
+5. Start Kafka Broker (tunggu fully started)
+6. Start semua service confluent lainnya yg diinginkan
 
 
 
