@@ -299,20 +299,29 @@ server.3=localhost:2890:3890
 EOF
 ```
 
-3. Start ZK1, ZK2, ZK3 (tunggu fully started)
+3. remove metadata broker lama
 ```
-sudo /usr/bin/zookeeper-server-start /etc/kafka/zookeeper1.properties
-sudo /usr/bin/zookeeper-server-start /etc/kafka/zookeeper2.properties
-sudo /usr/bin/zookeeper-server-start /etc/kafka/zookeeper3.properties
+rm -rf /var/lib/kafka*
 ```
-
 4. Update Kafka config (zookeeper.connect string)
 ```
 sudo sed -i 's/zookeeper.connect=.*/zookeeper.connect=localhost:2181,localhost:2182,localhost:2183/' \
   /etc/kafka/server.properties
 ```
-5. Start Kafka Broker (tunggu fully started)
-6. Start semua service confluent lainnya yg diinginkan
+5. Start ZK1, ZK2, ZK3 (tunggu fully started). nb: saat awal start 1zk akan terlihat error, lanjuntkan saja start zk lainnya. setelah ketiga zk running akan terlihat normal
+```
+sudo /usr/bin/zookeeper-server-start /etc/kafka/zookeeper1.properties
+sudo /usr/bin/zookeeper-server-start /etc/kafka/zookeeper2.properties
+sudo /usr/bin/zookeeper-server-start /etc/kafka/zookeeper3.properties
+```
+6. cek zk berhasil start dan listen
+```
+sudo netstat -tlnp | grep -E "2181|2182|2183"
+```
+<img width="1140" height="143" alt="image" src="https://github.com/user-attachments/assets/4190c7b3-5bbd-44f9-8469-4e3d2923abff" />
+
+7. Start Kafka Broker (tunggu fully started)
+8. Start semua service confluent lainnya yg diinginkan
 
 
 
