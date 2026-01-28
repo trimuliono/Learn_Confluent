@@ -339,6 +339,21 @@ confluent.metrics.reporter.topic.replicas=1
 
 <img width="785" height="944" alt="image" src="https://github.com/user-attachments/assets/0cfb1e4c-0032-4d47-b08b-2c8514f3af17" />
 
+**10. Cek Zookeeper quorum dan broker id**
+Quorum adalah mayoritas node, dihitung dengan floor(N/2)+1. Sistem masih berjalan selama jumlah node aktif ≥ quorum
+```
+zookeeper-shell localhost:2181
+```
+
+```
+ls /
+ls /brokers/ids
+get /zookeeper/config
+```
+
+<img width="1536" height="471" alt="image" src="https://github.com/user-attachments/assets/1810a8f2-52fe-4948-a45d-7eca78422dab" />
+
+
 ---
 
 
