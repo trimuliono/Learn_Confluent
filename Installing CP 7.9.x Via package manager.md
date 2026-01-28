@@ -356,4 +356,6 @@ confluent.metrics.reporter.topic.replicas=1
 
 
 
-Source: https://docs.confluent.io/platform/7.9/installation/installing_cp/deb-ubuntu.html#systemd-ubuntu-debian-install
+Source: 
+- https://docs.confluent.io/platform/7.9/installation/installing_cp/deb-ubuntu.html#systemd-ubuntu-debian-install
+- https://docs.confluent.io/platform/7.9/monitor/metrics-reporter.html
