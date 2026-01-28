@@ -349,9 +349,11 @@ zookeeper-shell localhost:2181
 ls /
 ls /brokers/ids
 get /zookeeper/config
+get /controller
 ```
 
-<img width="1536" height="471" alt="image" src="https://github.com/user-attachments/assets/1810a8f2-52fe-4948-a45d-7eca78422dab" />
+<img width="1553" height="531" alt="image" src="https://github.com/user-attachments/assets/81512655-5d69-4b46-9f10-d82ceccfca7d" />
+
 
 
 ---
