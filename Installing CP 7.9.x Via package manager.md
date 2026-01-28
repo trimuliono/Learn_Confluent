@@ -322,6 +322,19 @@ sudo netstat -tlnp | grep -E "2181|2182|2183"
 
 7. Start Kafka Broker (tunggu fully started)
 8. Start semua service confluent lainnya yg diinginkan
+<img width="420" height="470" alt="image" src="https://github.com/user-attachments/assets/6d15d1b9-60ad-480c-99e6-06e091c438e4" />
+9. Edit config broker agar semua info metrics muncul pada c3, lalu restart broker dan refresh ui c3
+```
+sudo nano /etc/kafka/server.properties
+
+# metrick agar info pada c3 tampil
+metric.reporters=io.confluent.metrics.reporter.ConfluentMetricsReporter
+confluent.metrics.reporter.bootstrap.servers=localhost:9092
+#
+# Uncomment the following line if the metrics cluster has a single broker
+confluent.metrics.reporter.topic.replicas=1
+```
+<img width="785" height="944" alt="image" src="https://github.com/user-attachments/assets/2cedffa9-6b3d-411e-9e14-2019810fe71e" />
 
 
 
