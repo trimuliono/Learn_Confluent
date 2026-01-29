@@ -30,7 +30,92 @@ Dibanding JSON / String:
 
 📌 **Di Confluent, Avro + Schema Registry itu “default enterprise pattern”**
 
+2️⃣ **Arsitektur yang sedang kamu bangun**
+```text
+Kafka Producer
+   |
+   | (Avro + Schema ID)
+   v
+Kafka Topic  <---->  Schema Registry
+   |
+   v
+Kafka Consumer
+```
+Yang dikirim ke Kafka **BUKAN schema**, tapi:
+- **payload Avro (binary)**
+- **schema ID** (lookup ke Schema Registry)
 
+3️⃣ **Prerequisite (WAJIB sebelum lanjut)**
+✅ A. Service harus RUNNING
+Pastikan semua ini UP
+```bash
+systemctl status confluent-server
+systemctl status confluent-schema-registry
+systemctl status confluent-control-center
+```
+4️⃣ **Buat Topic Kafka**
+```bash
+kafka-topics --create --topic \
+avro-user-demo --partitions 1 \
+--replication-factor 1 \
+--bootstrap-server localhost:9092
+```
+verifikasi:
+```bash
+kafka-topics --bootstrap-server localhost:9092 --list |grep avro
+```
+<img width="876" height="126" alt="image" src="https://github.com/user-attachments/assets/d94f080b-a151-427e-a950-500f3fee690e" />
+
+5️⃣ **Jalankan Kafka Avro Console Producer**
+Command utama:
+```bash
+kafka-avro-console-producer \
+  --bootstrap-server localhost:9092 \
+  --topic avro-user \
+  --property schema.registry.url=http://localhost:8085 \
+  --property value.schema='
+{
+  "type": "record",
+  "name": "User",
+  "namespace": "com.example.avro",
+  "fields": [
+    {"name": "id", "type": "int"},
+    {"name": "name", "type": "string"},
+    {"name": "email", "type": ["null","string"], "default": null}
+  ]
+}'
+```
+📌 **Yang terjadi di belakang layar**
+- Schema AUTO-REGISTER ke Schema Registry
+- Topic belum berisi apa pun sampai kamu kirim data
+   
+6️⃣ **Produce data (ketik manual)**
+
+Di **Avro JSON encoding**, kalau field bertipe **union (["null","string"])**:
+❌ TIDAK BOLEH langsung string
+```
+"email": "ihsan@mail.com"
+```
+✅ HARUS pakai wrapper union
+```
+"email": {"string": "ihsan@mail.com"}
+```
+dan untuk null
+```
+"email": null
+```
+
+Di prompt producer, kirim JSON sesuai schema:
+```
+{"id":1,"name":"tri","email":{"string":"tri@mail.com"}}
+{"id":2,"name":"kafka-user","email":null}
+{"id":3,"name":"ihsan"}
+```
+7️⃣
+
+8️⃣
+
+9️⃣
 
 
 ---
