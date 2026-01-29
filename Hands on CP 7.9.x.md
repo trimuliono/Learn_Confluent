@@ -45,7 +45,9 @@ Yang dikirim ke Kafka **BUKAN schema**, tapi:
 - **payload Avro (binary)**
 - **schema ID** (lookup ke Schema Registry)
 
+
 3️⃣ **Prerequisite (WAJIB sebelum lanjut)**
+
 ✅ A. Service harus RUNNING
 Pastikan semua ini UP
 ```bash
@@ -67,6 +69,7 @@ kafka-topics --bootstrap-server localhost:9092 --list |grep avro
 <img width="876" height="126" alt="image" src="https://github.com/user-attachments/assets/d94f080b-a151-427e-a950-500f3fee690e" />
 
 5️⃣ **Jalankan Kafka Avro Console Producer**
+
 Command utama:
 ```bash
 kafka-avro-console-producer \
@@ -91,6 +94,14 @@ kafka-avro-console-producer \
    
 6️⃣ **Produce data (ketik manual)**
 
+Di prompt producer, kirim JSON sesuai schema:
+```
+{"id":1,"name":"tri","email":{"string":"tri@mail.com"}}
+{"id":2,"name":"kafka-user","email":null}
+{"id":3,"name":"confluent","email":{"string":"cp@confluent.io"}
+```
+> `Ctrl + D` → keluar producer
+
 Di **Avro JSON encoding**, kalau field bertipe **union (["null","string"])**:
 ❌ TIDAK BOLEH langsung string
 ```
@@ -105,17 +116,60 @@ dan untuk null
 "email": null
 ```
 
-Di prompt producer, kirim JSON sesuai schema:
+7️⃣ **Cek Schema Registry (VALIDASI PENTING)**
+
+**7.1 Lihat subject**
+```
+curl http://localhost:8085/subjects
+```
+Output:
+```
+["avro-user-demo-value"]
+```
+📌 **Naming rule**
+```
+<topic-name>-value
+```
+
+**7.2 Lihat schema version**
+```
+curl http://localhost:8085/subjects/avro-user-demo-value/versions
+```
+Output:
+```
+[1]
+```
+
+**7.3 Lihat schema detail**
+```
+curl --silent http://localhost:8085/subjects/avro-user-demo-value/versions/1 | jq
+```
+
+8️⃣ **Jalankan Kafka Avro Console Consumer**
+
+```
+kafka-avro-console-consumer \
+  --bootstrap-server localhost:9092 \
+  --topic avro-user-demo \
+  --from-beginning \
+  --property schema.registry.url=http://localhost:8085
+```
+Output:
 ```
 {"id":1,"name":"tri","email":{"string":"tri@mail.com"}}
 {"id":2,"name":"kafka-user","email":null}
-{"id":3,"name":"ihsan"}
+{"id":3,"name":"confluent","email":{"string":"cp@confluent.io"}}
 ```
-7️⃣
+🎯 **Avro berhasil end-to-end**
 
-8️⃣
+9️⃣ **Verifikasi dari Control Center (C3)**
 
-9️⃣
+1. Buka **Control Center**
+2. Masuk cluster
+3. Buka **Topics → avro-user-demo**
+4. Lihat:
+    - Messages count bertambah
+    - Value format: **AVRO**
 
 
 ---
