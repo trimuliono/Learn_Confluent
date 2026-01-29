@@ -170,6 +170,13 @@ Output:
 4. Lihat:
     - Messages count bertambah
     - Value format: **AVRO**
+      
+<img width="951" height="394" alt="image" src="https://github.com/user-attachments/assets/1e7a22af-eb0e-4bc7-a3b9-f676e93dc105" />
+
+<img width="1888" height="937" alt="image" src="https://github.com/user-attachments/assets/5a2fc50b-9d6c-4116-ba8f-8c71ada966f0" />
+
+<img width="942" height="465" alt="image" src="https://github.com/user-attachments/assets/7bcf84e0-1a16-45c2-878e-39cbd5c9a3dd" />
+
 
 
 ---
