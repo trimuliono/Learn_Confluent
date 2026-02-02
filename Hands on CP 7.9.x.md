@@ -177,6 +177,100 @@ Output:
 
 <img width="942" height="465" alt="image" src="https://github.com/user-attachments/assets/7bcf84e0-1a16-45c2-878e-39cbd5c9a3dd" />
 
+---
+### Schema Evolution Avro (V2) – Confluent Platform 7.9
+1️⃣ Tujuan Lab
+Melakukan schema evolution pada Avro schema di Kafka menggunakan Schema Registry, tanpa merusak consumer lama.
+
+Pada lab ini kita akan:
+
+- Menambahkan field baru ke schema (age)
+- Mengatur compatibility mode
+- Membuktikan producer baru (v2) masih bisa dibaca consumer lama (v1)
+
+2️⃣ Konsep Dasar (WAJIB PAHAM)
+🔹 Apa itu Schema Evolution?
+
+Schema Evolution adalah kemampuan untuk mengubah schema data (tambah/hapus/ubah field) tanpa memutus sistem yang sudah berjalan.
+
+Kafka + Avro + Schema Registry menyediakan:
+
+- Versioning schema
+- Compatibility check
+- Centralized schema management
+
+🔹 Compatibility Mode (ringkas tapi penting)
+| Mode     | Penjelasan                        |
+| -------- | --------------------------------- |
+| BACKWARD | Consumer lama bisa baca data baru |
+| FORWARD  | Consumer baru bisa baca data lama |
+| FULL     | Dua arah                          |
+| NONE     | Tidak ada proteksi (⚠️ bahaya)    |
+
+📌 Best practice default: BACKWARD
+
+3️⃣ Kondisi Awal (Schema V1)
+Schema awal yang sudah kamu gunakan:
+```
+{
+  "type": "record",
+  "name": "User",
+  "namespace": "com.example.avro",
+  "fields": [
+    {"name": "id", "type": "int"},
+    {"name": "name", "type": "string"},
+    {"name": "email", "type": ["null","string"], "default": null}
+  ]
+}
+```
+👉 Ini akan tersimpan di Schema Registry sebagai:
+```
+Subject: avro-user-demo-value
+Version: 1
+```
+
+4️⃣ Set Compatibility Mode (BACKWARD)
+🔹 Cek compatibility saat ini
+```
+curl http://localhost:8085/config/avro-user-demo-value
+```
+Jika belum ada:
+```json
+{"compatibilityLevel":"BACKWARD"}
+```
+Jika mau set ulang (opsional tapi bagus untuk lab):
+```
+curl -X PUT \
+  -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+  --data '{"compatibility":"BACKWARD"}' \
+  http://localhost:8085/config/avro-user-demo-value
+```
+
+5️⃣ Schema Evolution: Versi 2 (V2)
+🔹 Perubahan yang dilakukan
+Kita MENAMBAHKAN field baru:
+```
+{"name": "age", "type": ["null","int"], "default": null}
+```
+📌 Kenapa:
+Type union dengan `null`
+Ada `default`
+➡️ Ini syarat BACKWARD compatibility
+
+🔹 Schema V2 (lengkap)
+```
+{
+  "type": "record",
+  "name": "User",
+  "namespace": "com.example.avro",
+  "fields": [
+    {"name": "id", "type": "int"},
+    {"name": "name", "type": "string"},
+    {"name": "email", "type": ["null","string"], "default": null},
+    {"name": "age", "type": ["null","int"], "default": null}
+  ]
+}
+```
 
 
 ---
