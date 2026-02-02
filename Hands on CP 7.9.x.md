@@ -74,7 +74,7 @@ Command utama:
 ```bash
 kafka-avro-console-producer \
   --bootstrap-server localhost:9092 \
-  --topic avro-user \
+  --topic avro-user-demo \
   --property schema.registry.url=http://localhost:8085 \
   --property value.schema='
 {
@@ -271,6 +271,69 @@ Ada `default`
   ]
 }
 ```
+
+6️⃣ Produce Data dengan Schema V2
+```
+kafka-avro-console-producer \
+  --topic avro-user-demo \
+  --bootstrap-server localhost:9092 \
+  --property schema.registry.url=http://localhost:8085 \
+  --property value.schema='
+{
+  "type": "record",
+  "name": "User",
+  "namespace": "com.example.avro",
+  "fields": [
+    {"name": "id", "type": "int"},
+    {"name": "name", "type": "string"},
+    {"name": "email", "type": ["null","string"], "default": null},
+    {"name": "age", "type": ["null","int"], "default": null}
+  ]
+}'
+```
+Input data:
+```
+{"id":4,"name":"budi","email":{"string":"budi@mail.com"},"age":{"int":30}}
+```
+✔️ Schema Registry akan:
+- Mendeteksi perubahan
+- Register sebagai version 2
+
+7️⃣ Verifikasi Schema Registry
+🔹 List subject
+```
+curl http://localhost:8085/subjects
+```
+🔹 Lihat versi schema
+```
+curl http://localhost:8085/subjects/avro-user-demo-value/versions
+```
+🔹 Lihat versi schema
+```
+[1,2]
+```
+<img width="1880" height="937" alt="image" src="https://github.com/user-attachments/assets/3b071e52-be4d-4826-bdbe-ec405b0e6a73" />
+
+
+8️⃣ Consume Data (Backward Compatibility Test)
+```
+kafka-avro-console-consumer \
+  --bootstrap-server localhost:9092 \
+  --topic avro-user-demo \
+  --from-beginning \
+  --property schema.registry.url=http://localhost:8085
+```
+Output:
+```
+{"id":1,"name":"tri","email":{"string":"tri@mail.com"}}
+{"id":2,"name":"kafka-user","email":null}
+{"id":3,"name":"confluent","email":{"string":"cp@confluent.io"}}
+{"id":4,"name":"budi","email":{"string":"budi@mail.com"},"age":{"int":30}}
+```
+> 📌  Consumer lama (schema lama) dapat membaca data yang diproduce dengan schema baru
+<img width="1904" height="890" alt="image" src="https://github.com/user-attachments/assets/4a1a51c4-4296-4619-856c-05d3f3ce5416" />
+
+<img width="1368" height="300" alt="image" src="https://github.com/user-attachments/assets/a1cdee47-fec3-4674-b844-08fe9d8017f9" />
 
 
 ---
