@@ -335,6 +335,406 @@ Output:
 
 <img width="1368" height="300" alt="image" src="https://github.com/user-attachments/assets/a1cdee47-fec3-4674-b844-08fe9d8017f9" />
 
+---
+Siap.
+Di bawah ini **SATU DOKUMEN MARKDOWN UTUH**, **lengkap**, **rapi**, **siap copy–paste**, **tanpa ada teks di luar markdown**.
+Langsung bisa kamu simpan sebagai file `.md`.
+
+---
+
+
+### 📘 LAB: Kafka Connect Source (Datagen) & Sink (JDBC PostgreSQL)
+**Confluent Platform 7.9**
+
+---
+
+#### 1️⃣ Tujuan Lab
+
+Pada lab ini peserta akan:
+
+- Memahami arsitektur Kafka Connect
+- Menjalankan Kafka Connect dalam Distributed Mode
+- Membuat Source Connector menggunakan Datagen
+- Membuat Sink Connector menggunakan JDBC ke PostgreSQL (remote server)
+- Menggunakan Avro dan Schema Registry
+- Memverifikasi alur data end-to-end
+- Mengelola lifecycle connector (create, pause, resume, delete)
+
+---
+
+##### 2️⃣ Konsep Dasar Kafka Connect
+
+##### 🔹 Apa itu Kafka Connect
+
+Kafka Connect adalah framework bawaan Apache Kafka yang digunakan untuk:
+
+- Mengambil data dari sistem eksternal ke Kafka (Source Connector)
+- Mengirim data dari Kafka ke sistem eksternal (Sink Connector)
+- Tanpa perlu menulis kode producer atau consumer secara manual
+
+---
+
+##### 🔹 Tipe Connector
+
+| Tipe | Fungsi |
+|-----|------|
+| Source Connector | External system → Kafka |
+| Sink Connector | Kafka → External system |
+
+---
+
+##### 🔹 Mode Kafka Connect
+
+| Mode | Kegunaan |
+|----|--------|
+| Standalone | Development / Lab |
+| Distributed | Production / High Availability |
+
+> **Lab ini menggunakan Distributed Mode**
+
+---
+
+#### 3️⃣ Arsitektur Lab
+
+```
+
+Datagen Source Connector
+↓ (Avro + Schema Registry)
+Kafka Topic: kafka-connect-demo
+↓
+JDBC Sink Connector
+↓
+PostgreSQL (Remote Server)
+Table: kafka_connect_demo
+
+````
+
+---
+
+#### 4️⃣ Prerequisite
+
+##### 🔹 Pastikan Service RUNNING
+
+```bash
+systemctl status confluent-server
+systemctl status confluent-schema-registry
+systemctl status confluent-control-center
+systemctl status confluent-kafka-connect
+````
+
+---
+
+##### 🔹 Cek Kafka Connect REST API
+
+```bash
+curl http://localhost:8083/connectors
+```
+
+Expected output:
+
+```json
+[]
+```
+
+---
+
+##### 🔹 Cek Schema Registry
+
+> Pada lab ini Schema Registry berjalan di **port 8085**
+
+```bash
+curl http://localhost:8085/subjects
+```
+
+---
+
+#### 5️⃣ Buat Kafka Topic
+
+```bash
+kafka-topics \
+  --bootstrap-server localhost:9092 \
+  --create \
+  --topic kafka-connect-demo \
+  --partitions 1 \
+  --replication-factor 1
+```
+
+---
+
+#### 6️⃣ Install Kafka Connect Plugins
+
+##### 🔹 Install Datagen Source Connector
+
+```bash
+sudo confluent-hub install confluentinc/kafka-connect-datagen:latest
+```
+
+Pilih:
+
+* `1` → installed rpm/deb package
+* `y` → update detected configs
+
+---
+
+##### 🔹 Install JDBC Sink Connector
+
+```bash
+sudo confluent-hub install confluentinc/kafka-connect-jdbc:latest
+```
+
+Pilih:
+
+* `1` → installed rpm/deb package
+* `y` → update detected configs
+
+---
+
+##### 🔹 Restart Kafka Connect
+
+```bash
+sudo systemctl restart confluent-kafka-connect
+```
+
+---
+
+##### 🔹 Verifikasi Plugin Terinstall
+
+```bash
+curl --silent http://localhost:8083/connector-plugins | jq
+```
+
+Pastikan muncul:
+
+* `io.confluent.kafka.connect.datagen.DatagenConnector`
+* `io.confluent.connect.jdbc.JdbcSinkConnector`
+
+---
+
+#### 7️⃣ Source Connector – Datagen (Avro)
+
+##### 🔹 Tujuan
+
+Menghasilkan data dummy (users) dan mengirimkannya ke Kafka Topic menggunakan Avro dan Schema Registry.
+
+---
+
+##### 🔹 Config Datagen Source Connector
+
+📄 **datagen-source-connector.json**
+
+```json
+{
+  "name": "datagen-source-connect-demo",
+  "config": {
+    "connector.class": "io.confluent.kafka.connect.datagen.DatagenConnector",
+    "tasks.max": "1",
+    "kafka.topic": "kafka-connect-demo",
+    "quickstart": "users",
+    "iterations": "10",
+
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "io.confluent.connect.avro.AvroConverter",
+    "value.converter.schema.registry.url": "http://localhost:8085"
+  }
+}
+```
+
+---
+
+##### 🔹 Create Datagen Source Connector
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  --data @datagen-source-connector.json \
+  http://localhost:8083/connectors
+```
+
+---
+
+##### 🔹 Cek Status Source Connector
+
+```bash
+curl http://localhost:8083/connectors/datagen-source-connect-demo/status | jq
+```
+
+> ⚠️ Jika task berstatus `FAILED` dengan pesan
+> `generated the configured X number of messages`
+> **Ini NORMAL**, Datagen berhenti setelah `iterations` terpenuhi.
+
+---
+
+#### 8️⃣ Verifikasi Data di Kafka
+
+```bash
+kafka-avro-console-consumer \
+  --bootstrap-server localhost:9092 \
+  --topic kafka-connect-demo \
+  --from-beginning \
+  --property schema.registry.url=http://localhost:8085
+```
+
+Contoh output:
+
+```json
+{"registertime":151876119232,"userid":"User_9","regionid":"Region_8","gender":"FEMALE"}
+```
+
+---
+
+#### 9️⃣ Sink Connector – JDBC PostgreSQL (Remote Server)
+
+##### 🔹 Prerequisite Database
+
+* PostgreSQL berada di server lain
+* User database memiliki privilege:
+
+  * CONNECT
+  * CREATE
+  * INSERT
+  * USAGE pada schema (misalnya `public`)
+
+> **Tabel TIDAK perlu dibuat manual**
+> JDBC Sink akan membuat tabel otomatis (`auto.create=true`)
+
+---
+
+##### 🔹 Config JDBC Sink Connector
+
+📄 **jdbc-sink-connector.json**
+
+```json
+{
+  "name": "jdbc-sink-postgres-demo",
+  "config": {
+    "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
+    "tasks.max": "1",
+    "topics": "kafka-connect-demo",
+
+    "connection.url": "jdbc:postgresql://10.100.13.205:5432/ihsan",
+    "connection.user": "ihsan",
+    "connection.password": "ihsan",
+
+    "auto.create": "true",
+    "auto.evolve": "true",
+
+    "insert.mode": "insert",
+    "pk.mode": "none",
+
+    "table.name.format": "kafka_connect_demo",
+
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "io.confluent.connect.avro.AvroConverter",
+    "value.converter.schema.registry.url": "http://localhost:8085"
+  }
+}
+```
+
+---
+
+##### 🔹 Create JDBC Sink Connector
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  --data @jdbc-sink-connector.json \
+  http://localhost:8083/connectors
+```
+
+---
+
+##### 🔹 Cek Status Sink Connector
+
+```bash
+curl http://localhost:8083/connectors/jdbc-sink-postgres-demo/status | jq
+```
+
+Expected:
+
+```json
+"state": "RUNNING"
+```
+
+---
+
+#### 🔟 Verifikasi Data di PostgreSQL
+
+```bash
+psql -h 10.100.13.205 -U ihsan -d ihsan
+```
+
+```sql
+\d kafka_connect_demo;
+SELECT * FROM kafka_connect_demo;
+```
+
+---
+
+#### 1️⃣1️⃣ Mengelola Lifecycle Connector
+
+##### 🔹 Pause Connector
+
+```bash
+curl -X PUT http://localhost:8083/connectors/datagen-source-connect-demo/pause
+```
+
+---
+
+##### 🔹 Resume Connector
+
+```bash
+curl -X PUT http://localhost:8083/connectors/datagen-source-connect-demo/resume
+```
+
+---
+
+##### 🔹 Delete Connector
+
+```bash
+curl -X DELETE http://localhost:8083/connectors/datagen-source-connect-demo
+```
+
+---
+
+## 1️⃣2️⃣ Troubleshooting
+
+##### ❌ Sink tidak membuat tabel
+
+* User database tidak punya privilege CREATE
+* Schema bukan `public`
+* Salah `connection.url`
+
+---
+
+##### ❌ Error Avro / Schema not found
+
+* Schema Registry tidak RUNNING
+* Port Schema Registry salah
+* Subject terhapus
+
+---
+
+##### ❌ Datagen task FAILED
+
+* Normal jika `iterations` sudah habis
+* Connector tetap bisa dihapus atau di-pause
+
+---
+
+#### 1️⃣3️⃣ Kesimpulan Lab
+
+* Datagen berhasil menghasilkan data dummy
+* Kafka menyimpan data dalam format Avro
+* Schema Registry mengelola schema
+* JDBC Sink berhasil auto-create tabel PostgreSQL
+* Data mengalir end-to-end dari Kafka ke database
+
+---
+
+
+
+
+
 
 ---
 Source:
@@ -342,3 +742,4 @@ https://docs.confluent.io/platform/7.9/schema-registry/index.html
 https://docs.confluent.io/platform/7.9/schema-registry/serdes-develop/index.html
 https://docs.confluent.io/platform/7.9/schema-registry/serdes-develop/serdes-avro.html#kafka-avro-console-producer
 https://docs.confluent.io/platform/7.9/schema-registry/schema-compatibility.html
+https://docs.confluent.io/platform/7.9/connect/index.html
