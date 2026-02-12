@@ -852,6 +852,7 @@ EMIT CHANGES;
 ```sql
 SELECT * FROM female_users EMIT CHANGES;
 ```
+<img width="1523" height="669" alt="image" src="https://github.com/user-attachments/assets/a36d2bef-807d-4c1f-9b87-b5300d63cfd8" />
 
 ### 🔟 Projection (Pilih Kolom Tertentu)
 ```sql
@@ -860,8 +861,66 @@ SELECT userid, regionid
 FROM users_stream
 EMIT CHANGES;
 ```
+<img width="530" height="175" alt="image" src="https://github.com/user-attachments/assets/e5dbb23b-cf5a-46ac-8485-9b9015d0f553" />
 
+### 1️⃣1️⃣ Aggregation (STREAM → TABLE)
 
+#### 🔹 Hitung jumlah user per gender
+```
+CREATE TABLE gender_count AS
+SELECT gender,
+       COUNT(*) AS total
+FROM users_stream
+GROUP BY gender
+EMIT CHANGES;
+```
+
+#### 🔹 Query TABLE
+```
+SELECT * FROM gender_count EMIT CHANGES;
+```
+<img width="1868" height="603" alt="image" src="https://github.com/user-attachments/assets/819eda41-6d2c-47ab-a42d-2b19ee566ea7" />
+> TABLE akan menampilkan **state terbaru**, bukan semua event
+
+### 1️⃣2️⃣ Sink Hasil ksqlDB ke Kafka
+ksqlDB otomatis membuat topic baru untuk hasil STREAM/TABLE.
+
+Cek topic:
+```
+SHOW TOPICS;
+```
+<img width="675" height="300" alt="image" src="https://github.com/user-attachments/assets/10f6d7a5-3ad3-4d5e-b7c0-3d4ee8d3f033" />
+
+### 1️⃣3️⃣ Cleanup (Opsional)
+
+#### 🔹 Drop STREAM
+```
+DROP STREAM female_users DELETE TOPIC;
+DROP STREAM user_basic_info DELETE TOPIC;
+```
+
+#### 🔹 Drop TABLE
+```
+DROP TABLE gender_count DELETE TOPIC;
+```
+
+### 1️⃣4️⃣ Exit ksqlDB CLI
+```
+EXIT;
+# atau tekan Ctrl + D
+```
+
+### 1️⃣5️⃣ Troubleshooting
+
+❌ Tidak bisa baca Avro
+- Schema Registry tidak running
+- URL Schema Registry salah
+- VALUE_FORMAT bukan AVRO
+
+❌ Data tidak muncul
+- Offset belum earliest
+- Topic kosong
+- Producer sudah berhenti (iterations habis atau di pause)
 
 
 ---
@@ -871,3 +930,6 @@ https://docs.confluent.io/platform/7.9/schema-registry/serdes-develop/index.html
 https://docs.confluent.io/platform/7.9/schema-registry/serdes-develop/serdes-avro.html#kafka-avro-console-producer
 https://docs.confluent.io/platform/7.9/schema-registry/schema-compatibility.html
 https://docs.confluent.io/platform/7.9/connect/index.html
+https://docs.confluent.io/platform/7.9/ksqldb/index.html
+https://docs.confluent.io/platform/7.9/ksqldb/concepts.html
+https://docs.confluent.io/platform/7.9/ksqldb/developer-guide/ksqldb-reference.html
