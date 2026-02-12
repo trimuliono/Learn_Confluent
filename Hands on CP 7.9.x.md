@@ -720,18 +720,146 @@ curl -X DELETE http://localhost:8083/connectors/datagen-source-connect-demo
 * Connector tetap bisa dihapus atau di-pause
 
 ---
+## 📘 LAB: Stream Processing using ksqlDB Confluent Platform 7.9
 
-#### 1️⃣3️⃣ Kesimpulan Lab
+### 1️⃣ Tujuan Lab
 
-* Datagen berhasil menghasilkan data dummy
-* Kafka menyimpan data dalam format Avro
-* Schema Registry mengelola schema
-* JDBC Sink berhasil auto-create tabel PostgreSQL
-* Data mengalir end-to-end dari Kafka ke database
+Pada lab ini peserta akan:
 
----
+- Memahami konsep stream processing di Kafka
+- Menggunakan ksqlDB untuk query data Kafka secara real-time
+- Membuat STREAM dari topic Kafka (Avro)
+- Melakukan filtering, projection, dan aggregation
+- Membuat STREAM dan TABLE hasil transformasi
+- Memverifikasi data secara real-time
 
+### 2️⃣ Konsep Dasar ksqlDB
 
+#### 🔹 Apa itu ksqlDB
+
+ksqlDB adalah engine SQL streaming untuk Kafka yang memungkinkan kita:
+
+- Query data Kafka menggunakan SQL
+- Membuat stream & table tanpa menulis Java code
+- Melakukan transformasi data real-time
+- Menyimpan hasil transformasi kembali ke Kafka
+
+#### 🔹 Perbedaan STREAM vs TABLE
+
+| Konsep | Penjelasan |
+|-----|-----------|
+| STREAM | Event flow (append-only), cocok untuk event log |
+| TABLE | State (latest value per key), hasil agregasi |
+
+### 3️⃣ Arsitektur Lab
+```
+Datagen Source
+↓
+Kafka Topic (Avro)
+kafka-connect-demo
+↓
+ksqlDB
+├─ STREAM users_stream
+├─ STREAM filtered_stream
+└─ TABLE gender_count
+```
+### 4️⃣ Prerequisite
+
+Pastikan service berikut **RUNNING**:
+
+```bash
+systemctl status confluent-server
+systemctl status confluent-schema-registry
+systemctl status confluent-kafka-connect
+systemctl status confluent-ksqldb
+```
+
+####🔹 Verifikasi ksqlDB Server
+```
+ccurl --silent http://localhost:8088/info | jq
+```
+<img width="884" height="234" alt="image" src="https://github.com/user-attachments/assets/e3c477f9-6d77-4e59-b340-c6707ca98f34" />
+
+### 5️⃣ Masuk ke ksqlDB CLI
+```
+ksql http://localhost:8088
+```
+jika berhasil akan muncul prompt
+```
+ksql>
+```
+<img width="1106" height="644" alt="image" src="https://github.com/user-attachments/assets/d3ae405b-1e4c-4cf9-91f8-5153e961506a" />
+
+### 6️⃣ Set ksqlDB Properties (WAJIB)
+Agar ksqlDB bisa membaca Avro dari Schema Registry:
+```
+SET 'auto.offset.reset' = 'earliest';
+SET 'ksql.schema.registry.url' = 'http://localhost:8085';
+```
+<img width="1655" height="143" alt="image" src="https://github.com/user-attachments/assets/7fc1dcf1-08a9-4b0e-9967-759e9c47a4b1" />
+
+### 7️⃣ Verifikasi Topic Kafka
+```sql
+SHOW TOPICS;
+```
+Pastikan topic berikut muncul:
+```
+kafka-connect-demo
+```
+<img width="798" height="276" alt="image" src="https://github.com/user-attachments/assets/e8030ec5-bc46-484d-a835-392b863a80a5" />
+
+### 8️⃣ Buat STREAM dari Topic Kafka (Avro)
+
+#### 🔹 Buat STREAM `users_stream`
+```
+CREATE STREAM users_stream (
+  registertime BIGINT,
+  userid STRING,
+  regionid STRING,
+  gender STRING
+)
+WITH (
+  KAFKA_TOPIC = 'kafka-connect-demo',
+  VALUE_FORMAT = 'AVRO'
+);
+```
+#### 🔹 Verifikasi STREAM
+```sql
+SHOW STREAMS;
+
+DESCRIBE users_stream;
+```
+<img width="1149" height="627" alt="image" src="https://github.com/user-attachments/assets/9cb1aa46-b732-42f6-93c4-e7c89b3ac743" />
+
+#### 🔹 Query Data Real-Time
+```sql
+SELECT * FROM users_stream EMIT CHANGES;
+```
+Tekan `Ctrl + C` untuk keluar dari query.
+<img width="1814" height="524" alt="image" src="https://github.com/user-attachments/assets/cec9f8b2-2e09-41a1-9b64-79ae305f3e8c" />
+
+### 9️⃣ Filtering Data (STREAM → STREAM)
+
+#### 🔹 Buat STREAM hanya untuk gender FEMALE
+```sql
+CREATE STREAM female_users AS
+SELECT *
+FROM users_stream
+WHERE gender = 'FEMALE'
+EMIT CHANGES;
+```
+####🔹 Query hasil filter
+```sql
+SELECT * FROM female_users EMIT CHANGES;
+```
+
+### 🔟 Projection (Pilih Kolom Tertentu)
+```sql
+CREATE STREAM user_basic_info AS
+SELECT userid, regionid
+FROM users_stream
+EMIT CHANGES;
+```
 
 
 
