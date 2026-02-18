@@ -641,7 +641,7 @@ Setelah ZooKeeper quorum di-secure, langkah selanjutnya adalah mengamankan **kon
 cd /etc/kafka/secrets
 
 # Generate keystore untuk broker (koneksi ke ZK)
-keytool -keystore kafka.zk.keystore.jks \
+sudo keytool -keystore kafka.zk.keystore.jks \
   -alias broker-zk \
   -validity 365 \
   -genkey -keyalg RSA \
@@ -650,32 +650,32 @@ keytool -keystore kafka.zk.keystore.jks \
   -keypass password
 
 # Create CSR
-keytool -keystore kafka.zk.keystore.jks \
+sudo keytool -keystore kafka.zk.keystore.jks \
   -alias broker-zk \
   -certreq -file broker-zk.csr \
   -storepass password
 
 # Sign dengan CA
-openssl x509 -req \
+sudo openssl x509 -req \
   -CA ca-cert -CAkey ca-key \
   -in broker-zk.csr \
   -out broker-zk-signed.crt \
   -days 365 -CAcreateserial
 
 # Import CA cert ke keystore
-keytool -keystore kafka.zk.keystore.jks \
+sudo keytool -keystore kafka.zk.keystore.jks \
   -alias CARoot -import -file ca-cert \
   -storepass password -noprompt
 
 # Import signed cert ke keystore
-keytool -keystore kafka.zk.keystore.jks \
+sudo keytool -keystore kafka.zk.keystore.jks \
   -alias broker-zk -import -file broker-zk-signed.crt \
   -storepass password -noprompt
 ```
 
 ## 3.2 Buat JAAS File untuk Kafka (sebagai ZK Client)
 
-Buat file `/etc/kafka/kafka_zk_jaas.conf`:
+Buat file `/etc/kafka/kafka_zk_client_jaas.conf`:
 
 ```properties
 Client {
@@ -704,15 +704,32 @@ zookeeper.ssl.truststore.location=/etc/kafka/secrets/zk.truststore.jks
 zookeeper.ssl.truststore.password=password
 
 # Update zookeeper.connect jika menggunakan secure port
-zookeeper.connect=localhost:2181,localhost:2182,localhost:2183
+# zookeeper.connect=localhost:2181,localhost:2182,localhost:2183
+zookeeper.connect=localhost:2281,localhost:2282,localhost:2283
 ```
 
-## 3.4 Set Environment Variable
+## 3.4 Set Environment Variable untuk confluent-server (systemd)
 
-Update `/etc/default/kafka`:
+### 3.4.1. Buat override file
+Jalankan:
+```
+sudo systemctl edit confluent-server
 
+# Ini akan membuka editor dan membuat file:
+/etc/systemd/system/confluent-server.service.d/override.conf
+```
+isi dengan:
 ```bash
-KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/kafka_zk_jaas.conf"
+[Service]
+Environment="KAFKA_OPTS=-Djava.security.auth.login.config=/etc/kafka/kafka_zk_client_jaas.conf"
+```
+<img width="1019" height="115" alt="image" src="https://github.com/user-attachments/assets/867ce597-b00d-4916-bfe0-6ed943c38b16" />
+
+Save dan keluar.
+
+### 3.4.2. Reload systemd
+```
+sudo systemctl daemon-reload
 ```
 
 ## 3.5 Restart Kafka Broker
@@ -721,6 +738,19 @@ KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/kafka_zk_jaas.conf"
 sudo systemctl restart confluent-server
 ```
 
+### 3.5.1. Verifikasi JAAS Ter-load
+Cek dengan:
+```
+ps aux | grep java | grep kafka_zk_client_jaas.conf
+```
+Harus muncul:
+```
+-Djava.security.auth.login.config=/etc/kafka/kafka_zk_client_jaas.conf
+```
+<img width="928" height="128" alt="image" src="https://github.com/user-attachments/assets/adefee5a-b449-470f-804c-04d0c7293d21" />
+
+Kalau tidak muncul → JAAS tidak ter-load.
+
 ---
 
 ## 🧪 3.6 Testing ZooKeeper Client & Kafka↔ZK Connection
@@ -728,22 +758,23 @@ sudo systemctl restart confluent-server
 ### Test 1 — Verifikasi Broker Connect ke ZK via SSL
 
 ```bash
-sudo grep -i "zookeeper.*ssl\|zookeeper.*connect\|tls" /var/log/kafka/server.log | tail -10
+grep "zookeeper.ssl.client.enable\|zookeeper.clientCnxnSocket\|zookeeper.connect" /etc/kafka/server.properties
 ```
-
-**Expected:** Log menunjukkan koneksi SSL ke ZooKeeper berhasil.
-
-```
-INFO [ZooKeeperClient] Connected (SSL) to ZooKeeper ensemble
-```
+- Broker dikonfigurasi untuk connect via SSL (zookeeper.ssl.client.enable=true, port 2281)
+  
+<img width="1203" height="176" alt="image" src="https://github.com/user-attachments/assets/721c2d7b-779e-40d4-8c93-24d3175b62fc" />
 
 ### Test 2 — Broker Registered di ZK
 
 ```bash
 # Gunakan ZK shell dengan SSL config
-zookeeper-shell localhost:2181 \
-  -zk-tls-config-file /etc/kafka/zk-client-ssl.properties \
-  <<< "ls /brokers/ids"
+KAFKA_OPTS="
+-Djava.security.auth.login.config=/etc/kafka/zk_client_jaas.conf
+-Dzookeeper.client.secure=true
+-Dzookeeper.clientCnxnSocket=org.apache.zookeeper.ClientCnxnSocketNetty
+-Dzookeeper.ssl.trustStore.location=/etc/kafka/secrets/zk.truststore.jks
+-Dzookeeper.ssl.trustStore.password=password
+" zookeeper-shell localhost:2281 ls /brokers/ids
 ```
 
 **Expected:**
@@ -751,6 +782,9 @@ zookeeper-shell localhost:2181 \
 ```
 [0]   # atau ID broker Anda
 ```
+<img width="1174" height="374" alt="image" src="https://github.com/user-attachments/assets/221d5c7e-5512-43cb-b11a-2461cebacf9a" />
+
+- Broker berhasil register ke ZK yang hanya bisa diakses via SSL port → berarti koneksi SSL berhasil
 
 ### Test 3 — Kafka Masih Bisa Membuat Topic
 
@@ -767,6 +801,8 @@ kafka-topics --create \
 ```
 Created topic zk-test-topic.
 ```
+<img width="753" height="140" alt="image" src="https://github.com/user-attachments/assets/14ebd1d0-b077-4cfa-acbd-b9994fd8d183" />
+
 
 ### Test 4 — Non-SSL ZK Client Ditolak
 
@@ -776,17 +812,24 @@ zookeeper-shell localhost:2181 <<< "ls /"
 ```
 
 **Expected:** Koneksi gagal atau timeout karena ZK sekarang require SSL.
+<img width="1857" height="354" alt="image" src="https://github.com/user-attachments/assets/c04ff8d9-f842-4d48-b239-53a912acc2c5" />
 
 ### Test 5 — Verifikasi Metadata via ZK
 
 ```bash
-zookeeper-shell localhost:2181 \
-  -zk-tls-config-file /etc/kafka/zk-client-ssl.properties \
-  <<< "get /brokers/ids/0"
+KAFKA_OPTS="
+-Djava.security.auth.login.config=/etc/kafka/zk_client_jaas.conf
+-Dzookeeper.client.secure=true
+-Dzookeeper.clientCnxnSocket=org.apache.zookeeper.ClientCnxnSocketNetty
+-Dzookeeper.ssl.trustStore.location=/etc/kafka/secrets/zk.truststore.jks
+-Dzookeeper.ssl.trustStore.password=password
+" zookeeper-shell localhost:2281 get /brokers/ids/0
 ```
+<img width="1866" height="415" alt="image" src="https://github.com/user-attachments/assets/c25a45b6-e208-42a8-a221-7e0be99e3c37" />
 
 **Expected:** Menampilkan metadata broker (host, port, endpoints).
 
+> **Kesimpulan Test:** Koneksi broker → ZK via SSL **berhasil** (terbukti dari `SaslAuthenticated` di port 2281). Listener masih PLAINTEXT karena Step 4 belum dikerjakan — akan berubah ke SASL_SSL setelah Inter-Broker Security dikonfigurasi.
 ---
 
 # 🔄 4️⃣ KAFKA INTER-BROKER SECURITY (Encryption & Authentication)
