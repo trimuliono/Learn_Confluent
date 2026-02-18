@@ -282,7 +282,7 @@ keytool -list -keystore zk.truststore.jks -storepass password
 
 File JAAS mendefinisikan credential untuk authentication antar ZooKeeper nodes.
 
-Buat file `/etc/kafka/zk_server_jaas.conf`:
+### File `/etc/kafka/zk_server_jaas.conf` (untuk ZK server process):
 
 ```properties
 Server {
@@ -311,7 +311,25 @@ QuorumLearner {
 | `QuorumServer` | Authentication ketika node lain connect ke node ini |
 | `QuorumLearner` | Credential yang digunakan node ini untuk connect ke node lain |
 
+### File `/etc/kafka/zk_client_jaas.conf` (untuk testing client):
+
+```properties
+Client {
+  org.apache.zookeeper.server.auth.DigestLoginModule required
+  username="zkadmin"
+  password="zkadmin-secret";
+};
+```
+
+> **Penting:** `zk_server_jaas.conf` untuk ZK server process. `zk_client_jaas.conf` untuk client yang connect ke ZK (termasuk `zookeeper-shell`). Keduanya file terpisah karena section JAAS yang dibutuhkan berbeda.
+
 ## 2.5 Update zookeeper.properties (Setiap Node)
+
+> **Catatan penting tentang konfigurasi tambahan:**
+> - `secureClientPort` menambahkan port SSL **terpisah** dari `clientPort` (plain). Keduanya aktif bersamaan — plain port tetap ada tapi dilindungi SASL enforcement.
+> - `serverCnxnFactory=...NettyServerCnxnFactory` **wajib** karena NIO (default) tidak support SSL. Tanpa ini, ZK crash dengan `SSL isn't supported in NIOServerCnxn`.
+> - `ssl.keyStore.*` dan `ssl.trustStore.*` (tanpa prefix `quorum.`) diperlukan untuk **client SSL port**. Ini berbeda dari `ssl.quorum.keyStore.*` yang hanya untuk komunikasi antar ZK nodes.
+> - `ssl.clientAuth=none` artinya server tidak meminta client certificate (one-way TLS).
 
 Tambahkan konfigurasi berikut ke setiap `zookeeper.properties`:
 
@@ -330,9 +348,15 @@ authProvider.1=org.apache.zookeeper.server.auth.SASLAuthenticationProvider
 requireClientAuthScheme=sasl
 enforce.auth.enabled=true
 enforce.auth.schemes=sasl
+
+# === Secure Client Port (SSL) ===
 secureClientPort=2281
-# ZooKeeper default pakai NIO connection factory, yang tidak support SSL. Untuk SSL client port, harus pakai Netty.
 serverCnxnFactory=org.apache.zookeeper.server.NettyServerCnxnFactory
+ssl.clientAuth=none
+ssl.keyStore.location=/etc/kafka/secrets/zk1.keystore.jks
+ssl.keyStore.password=password
+ssl.trustStore.location=/etc/kafka/secrets/zk.truststore.jks
+ssl.trustStore.password=password
 ```
 <img width="935" height="255" alt="image" src="https://github.com/user-attachments/assets/98338315-66c0-487f-b8a8-2a12f65c1f88" />
 
@@ -347,14 +371,21 @@ ssl.quorum.keyStore.location=/etc/kafka/secrets/zk2.keystore.jks
 ssl.quorum.keyStore.password=password
 ssl.quorum.trustStore.location=/etc/kafka/secrets/zk.truststore.jks
 ssl.quorum.trustStore.password=password
+
 # === SASL Authentication ===
 authProvider.1=org.apache.zookeeper.server.auth.SASLAuthenticationProvider
 requireClientAuthScheme=sasl
 enforce.auth.enabled=true
 enforce.auth.schemes=sasl
+
+# === Secure Client Port (SSL) ===
 secureClientPort=2282
-# ZooKeeper default pakai NIO connection factory, yang tidak support SSL. Untuk SSL client port, harus pakai Netty.
 serverCnxnFactory=org.apache.zookeeper.server.NettyServerCnxnFactory
+ssl.clientAuth=none
+ssl.keyStore.location=/etc/kafka/secrets/zk2.keystore.jks
+ssl.keyStore.password=password
+ssl.trustStore.location=/etc/kafka/secrets/zk.truststore.jks
+ssl.trustStore.password=password
 ```
 <img width="810" height="705" alt="image" src="https://github.com/user-attachments/assets/82baa24f-be68-424b-9b8b-eeb11041902f" />
 
@@ -367,16 +398,32 @@ ssl.quorum.keyStore.location=/etc/kafka/secrets/zk3.keystore.jks
 ssl.quorum.keyStore.password=password
 ssl.quorum.trustStore.location=/etc/kafka/secrets/zk.truststore.jks
 ssl.quorum.trustStore.password=password
+
 # === SASL Authentication ===
 authProvider.1=org.apache.zookeeper.server.auth.SASLAuthenticationProvider
 requireClientAuthScheme=sasl
 enforce.auth.enabled=true
 enforce.auth.schemes=sasl
+
+# === Secure Client Port (SSL) ===
 secureClientPort=2283
-# ZooKeeper default pakai NIO connection factory, yang tidak support SSL. Untuk SSL client port, harus pakai Netty.
 serverCnxnFactory=org.apache.zookeeper.server.NettyServerCnxnFactory
+ssl.clientAuth=none
+ssl.keyStore.location=/etc/kafka/secrets/zk3.keystore.jks
+ssl.keyStore.password=password
+ssl.trustStore.location=/etc/kafka/secrets/zk.truststore.jks
+ssl.trustStore.password=password
 ```
 <img width="827" height="708" alt="image" src="https://github.com/user-attachments/assets/13a158d6-71cf-4439-9bdf-c06c0cea2acd" />
+
+### Perbedaan Property SSL di ZooKeeper
+
+| Property | Scope | Untuk |
+|----------|-------|-------|
+| `ssl.quorum.keyStore.*` | Quorum | Komunikasi antar ZK nodes (port 2888/3888) |
+| `ssl.quorum.trustStore.*` | Quorum | Verifikasi certificate ZK nodes lain |
+| `ssl.keyStore.*` | Client | Secure client port (secureClientPort) |
+| `ssl.trustStore.*` | Client | Verifikasi certificate client (jika clientAuth=need) |
 
 ## 2.6 Set Environment Variable untuk ZooKeeper
 
@@ -408,80 +455,173 @@ sudo -E /usr/bin/zookeeper-server-start -daemon /etc/kafka/zookeeper3.properties
 ```
 # Cek apakah KAFKA_OPTS masuk ke proses Java
 ps aux | grep zookeeper | grep jaas
+sudo ss -tlnp | grep -E "2181|2182|2183|2281|2282|2283"
 ```
 **Expected:** Muncul 3 proses Java dengan `-Djava.security.auth.login.config=/etc/kafka/zk_server_jaas.conf`.
 Kalau kosong, berarti `-E` tidak bekerja. Alternatifnya, edit langsung di start script `/usr/bin/zookeeper-server-start` tepat baris terakhir sebelum baris command `exec`.
 
 <img width="778" height="396" alt="image" src="https://github.com/user-attachments/assets/def976ef-5d18-48ed-9baf-09e520fcb899" />
+<img width="1045" height="232" alt="image" src="https://github.com/user-attachments/assets/78ec1cff-a704-4f78-adc4-ddf8c8942e27" />
+
 
 ---
 
 ## 🧪 2.8 Testing ZooKeeper Quorum Security
 
-### Test 1 — Plain Connection (Harus Gagal)
+### Test 1 — Verifikasi Quorum & Leader Election ✅
 
 ```bash
-echo stat | nc localhost 2181
+for port in 2181 2182 2183; do echo "Port $port: $(echo ruok | nc localhost $port)"; done
 ```
 
-**Expected Result:**
-Koneksi ditolak atau tidak ada response karena ZooKeeper sekarang require secure connection.
+**Expected:** Setiap node merespons `imok`.
 
-```
-Connection refused / timeout / empty response
+Verifikasi via log:
+```bash
+sudo grep -i "ssl handshake complete\|LEADING\|FOLLOWING\|Using TLS encrypted" /var/log/kafka/zookeeper.out | tail -10
 ```
 
-### Test 2 — Verifikasi Quorum Masih Berjalan
+**Actual result:**
+```
+INFO Using TLS encrypted quorum communication
+INFO SSL handshake complete ... TLSv1.2 - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+INFO Accepted TLS connection from localhost/127.0.0.1
+INFO FOLLOWING - LEADER ELECTION TOOK - 647 MS
+```
+<img width="1865" height="283" alt="image" src="https://github.com/user-attachments/assets/1164359c-837c-45e8-9ca5-6eb0f7cc931f" />
+
+
+### Test 2 — Plain Connection Tanpa SASL (Harus Ditolak) ✅
 
 ```bash
-echo stat | openssl s_client -connect localhost:2181 2>/dev/null
+unset KAFKA_OPTS
+zookeeper-shell localhost:2181
 ```
 
-Atau cek via log:
+**Actual result:**
+```
+WatchedEvent state:AuthFailed type:None path:null
+Session ... Closing socket connection
+```
+<img width="1860" height="374" alt="image" src="https://github.com/user-attachments/assets/0da364ed-f9f9-445a-bc6d-85ed02b9d32a" />
+
+Server log menunjukkan:
+```
+ERROR Client authentication scheme(s) [ip] does not match with any of the expected authentication scheme [sasl], closing session.
+```
+<img width="1857" height="434" alt="image" src="https://github.com/user-attachments/assets/df7af05b-cd43-4e14-a60f-af2c50020a6e" />
+
+> Client tanpa SASL credential hanya membawa scheme `[ip]`. ZK membutuhkan `[sasl]` → session ditolak. **SASL enforcement bekerja.**
+
+### Test 3 — Plain Connection Dengan SASL (Harus Berhasil) ✅
 
 ```bash
-sudo grep -i "ssl" /var/log/kafka/zookeeper.log | tail -10
+KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/zk_client_jaas.conf" zookeeper-shell localhost:2181
 ```
 
-**Expected:** Log menunjukkan SSL handshake sukses antar nodes.
+**Actual result:**
+```
+WatchedEvent state:SyncConnected type:None path:null
+WatchedEvent state:SaslAuthenticated type:None path:null
+ls /
+[admin, brokers, cells, cluster, cluster_links, config, consumers, controller_epoch,
+ feature, isr_change_notification, latest_producer_id_block, leadership_priority,
+ log_dir_event_notification, tenants, zookeeper]
+```
+<img width="1852" height="332" alt="image" src="https://github.com/user-attachments/assets/9ebcc348-779f-4125-80d1-920345361fcc" />
 
-### Test 3 — Verifikasi Leader Election Masih Berfungsi
+> **`SaslAuthenticated`** membuktikan SASL berhasil. `ls /` menampilkan semua znodes — client dengan credential yang benar dapat mengakses data ZooKeeper.
+
+### Test 4 — Verifikasi SSL pada Secure Client Port ✅
 
 ```bash
-# Cek status masing-masing node
-echo mntr | nc localhost 2181 2>/dev/null
-echo mntr | nc localhost 2182 2>/dev/null
-echo mntr | nc localhost 2183 2>/dev/null
+echo "" | sudo openssl s_client -connect localhost:2281 -CAfile /etc/kafka/secrets/ca-cert 2>&1 | grep -i "verify\|subject\|issuer\|handshake"
 ```
 
-**Expected:** Salah satu node menunjukkan `zk_server_state=leader`, sisanya `follower`.
+**Actual result:**
+```
+verify return:1
+subject=C = ID, ST = DKI, L = Jakarta, O = Lab, CN = localhost
+issuer=CN = KafkaLabCA, O = Lab, L = Jakarta, ST = DKI, C = ID
+SSL handshake has read 4541 bytes and written 386 bytes
+    Verify return code: 0 (ok)
+```
+<img width="1752" height="164" alt="image" src="https://github.com/user-attachments/assets/c4b502f8-95fc-4431-b5bb-dd59f7e378a5" />
 
-### Test 4 — ZooKeeper Shell tanpa SSL
+> Port 2281 serve SSL dengan certificate chain valid. `Verify return code: 0 (ok)`.
+
+### Test 5 — ZooKeeper Shell via Secure Port Dengan SASL (Harus Berhasil) ✅
 
 ```bash
-zookeeper-shell localhost:2181 -zk-tls-config-file /etc/kafka/zk-client-ssl.properties
+KAFKA_OPTS="
+-Djava.security.auth.login.config=/etc/kafka/zk_client_jaas.conf
+-Dzookeeper.client.secure=true
+-Dzookeeper.clientCnxnSocket=org.apache.zookeeper.ClientCnxnSocketNetty
+-Dzookeeper.ssl.protocol=TLSv1.2
+-Dzookeeper.ssl.trustStore.location=/etc/kafka/secrets/zk.truststore.jks
+-Dzookeeper.ssl.trustStore.password=password
+-Dzookeeper.ssl.keyStore.location=/etc/kafka/secrets/zk1.keystore.jks
+-Dzookeeper.ssl.keyStore.password=password
+" zookeeper-shell localhost:2281
 ```
-<img width="929" height="118" alt="image" src="https://github.com/user-attachments/assets/1183fc68-1af8-4311-8802-941c64a74048" />
-
-### Test 5 — ZooKeeper Shell dengan SSL
-
-```bash
-zookeeper-shell localhost:2181 -zk-tls-config-file /etc/kafka/zk-client-ssl.properties
-```
-
-Buat file `zk-client-ssl.properties`:
-
-```properties
-zookeeper.ssl.client.enable=true
-zookeeper.ssl.protocol=TLSv1.2
-zookeeper.clientCnxnSocket=org.apache.zookeeper.ClientCnxnSocketNetty
-zookeeper.ssl.keyStore.location=/etc/kafka/secrets/zk1.keystore.jks
-zookeeper.ssl.keyStore.password=password
-zookeeper.ssl.trustStore.location=/etc/kafka/secrets/zk.truststore.jks
-zookeeper.ssl.trustStore.password=password
-```
+<img width="1852" height="462" alt="image" src="https://github.com/user-attachments/assets/1b035937-f6bc-4ec1-93ce-ad508fbdb353" />
 
 **Expected:** Berhasil connect dan bisa jalankan `ls /`.
+---
+## 🔧 2.9 Troubleshooting yang Ditemukan Selama Lab
+
+### Issue 1: `SSL isn't supported in NIOServerCnxn`
+
+**Gejala:** ZK crash saat start setelah menambahkan `secureClientPort`.
+
+**Solusi:** Tambahkan `serverCnxnFactory=org.apache.zookeeper.server.NettyServerCnxnFactory`.
+
+### Issue 2: `No JAAS configuration section named 'Client'`
+
+**Gejala:** `zookeeper-shell` gagal SASL karena `KAFKA_OPTS` menunjuk ke `zk_server_jaas.conf` yang tidak punya section `Client`.
+
+**Solusi:** Buat file JAAS terpisah (`zk_client_jaas.conf`) dengan section `Client`. Gunakan file ini saat menjalankan `zookeeper-shell`.
+
+### Issue 5: `handshake_failure` pada Secure Port
+
+**Penyebab:** ZK hanya punya `ssl.quorum.keyStore.*` (untuk quorum) tapi belum punya `ssl.keyStore.*` (untuk client port).
+
+**Solusi:** Tambahkan `ssl.keyStore.*`, `ssl.trustStore.*`, dan `ssl.clientAuth=none` di setiap `zookeeper*.properties`.
+
+> **Key learning:** `ssl.quorum.*` = antar ZK nodes. `ssl.*` (tanpa quorum) = untuk client port. Keduanya **harus** dikonfigurasi terpisah.
+
+---
+
+## ✅ 2.10 Ringkasan Hasil Testing Step 2
+
+| # | Test | Port | Hasil | Keterangan |
+|---|------|------|-------|------------|
+| 1 | Quorum SSL + Leader Election | 2888/3888 | ✅ Berhasil | TLS handshake berhasil, leader election normal |
+| 2 | Plain tanpa SASL | 2181 | ❌ Ditolak | `AuthFailed` — SASL enforcement aktif |
+| 3 | Plain dengan SASL | 2181 | ✅ Berhasil | `SaslAuthenticated` + `ls /` berhasil |
+| 4 | SSL verify (openssl) | 2281 | ✅ Berhasil | `Verify return code: 0 (ok)` |
+| 5 | ZK Shell via SSL dengan SASL | 2281 | ✅ Berhasil | `SaslAuthenticated` + `ls /` berhasil |
+
+### Security yang Tercapai di Step 2:
+
+```
+✅ Quorum Encryption    → Komunikasi antar ZK nodes terenkripsi (TLSv1.2)
+✅ Quorum Authentication → ZK nodes saling autentikasi via SASL Digest
+✅ Client Authentication → Hanya client dengan credential SASL yang bisa akses ZK
+✅ Secure Client Port    → Port 2281-2283 serve SSL (terverifikasi via openssl)
+✅ Client SSL Connection dengan SASL → Hanya client dengan credential SASL yang bisa akses ZK
+```
+
+### File yang Dibuat/Dimodifikasi di Step 2:
+
+| File | Lokasi | Fungsi |
+|------|--------|--------|
+| `ca-key`, `ca-cert` | `/etc/kafka/secrets/` | CA private key & certificate |
+| `zk[1-3].keystore.jks` | `/etc/kafka/secrets/` | Keystore per ZK node |
+| `zk.truststore.jks` | `/etc/kafka/secrets/` | Truststore shared |
+| `zk_server_jaas.conf` | `/etc/kafka/` | JAAS untuk ZK server |
+| `zk_client_jaas.conf` | `/etc/kafka/` | JAAS untuk ZK client testing |
+| `zookeeper[1-3].properties` | `/etc/kafka/` | Config ZK nodes (updated) |
 
 ---
 
