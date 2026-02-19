@@ -855,7 +855,7 @@ Jika inter-broker communication tidak secure:
 cd /etc/kafka/secrets
 
 # Generate Broker Keystore
-keytool -keystore kafka.server.keystore.jks \
+sudo keytool -keystore kafka.server.keystore.jks \
   -alias broker \
   -validity 365 \
   -genkey -keyalg RSA \
@@ -864,30 +864,30 @@ keytool -keystore kafka.server.keystore.jks \
   -keypass password
 
 # Create CSR
-keytool -keystore kafka.server.keystore.jks \
+sudo keytool -keystore kafka.server.keystore.jks \
   -alias broker \
   -certreq -file broker.csr \
   -storepass password
 
 # Sign with CA
-openssl x509 -req \
+sudo openssl x509 -req \
   -CA ca-cert -CAkey ca-key \
   -in broker.csr \
   -out broker-signed.crt \
   -days 365 -CAcreateserial
 
 # Create Truststore
-keytool -keystore kafka.server.truststore.jks \
+sudo keytool -keystore kafka.server.truststore.jks \
   -alias CARoot -import -file ca-cert \
   -storepass password -noprompt
 
 # Import CA cert ke keystore
-keytool -keystore kafka.server.keystore.jks \
+sudo keytool -keystore kafka.server.keystore.jks \
   -alias CARoot -import -file ca-cert \
   -storepass password -noprompt
 
 # Import signed cert ke keystore
-keytool -keystore kafka.server.keystore.jks \
+sudo keytool -keystore kafka.server.keystore.jks \
   -alias broker -import -file broker-signed.crt \
   -storepass password -noprompt
 ```
@@ -897,6 +897,7 @@ keytool -keystore kafka.server.keystore.jks \
 ```bash
 keytool -list -v -keystore kafka.server.keystore.jks -storepass password | grep -A2 "Alias"
 ```
+<img width="1363" height="192" alt="image" src="https://github.com/user-attachments/assets/5296aaf6-1ce8-4f64-8e60-7db201c60262" />
 
 ## 4.2 Buat JAAS File untuk Kafka Broker
 
@@ -957,13 +958,27 @@ ssl.truststore.password=password
 # === SASL Configuration ===
 sasl.enabled.mechanisms=PLAIN
 ```
+<img width="979" height="710" alt="image" src="https://github.com/user-attachments/assets/51cff89b-2a6f-4cb8-bb3d-b9aac46b3d34" />
 
 ## 4.4 Update Environment Variable
 
-Edit `/etc/default/kafka`:
+Edit `override file untuk confluent-server`:
 
 ```bash
-KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf"
+sudo systemctl edit confluent-server
+
+# replace Environment="KAFKA_OPTS=-Djava.security.auth.login.config=/etc/kafka/kafka_zk_client_jaas.conf"
+# dengan
+
+Environment="KAFKA_OPTS=-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf"
+```
+Save dan keluar.
+
+<img width="683" height="270" alt="image" src="https://github.com/user-attachments/assets/f8e9c48e-e7cf-4613-a3f8-b4a70e4bdca9" />
+
+### 4.4.1. Reload systemd
+```
+sudo systemctl daemon-reload
 ```
 
 > **Catatan:** File JAAS ini sekarang berisi section `KafkaServer` (untuk broker) DAN section `Client` (untuk koneksi ke ZooKeeper).
@@ -980,16 +995,19 @@ sudo systemctl restart confluent-server
 
 ### Test 1 — Verifikasi Broker Start dengan SASL_SSL
 
-```bash
-sudo grep -i "sasl_ssl\|inter.broker\|started" /var/log/kafka/server.log | tail -10
+```
+sudo journalctl -u confluent-server | grep -i "started\|registered broker\|sasl_ssl" | tail -10
 ```
 
-**Expected:**
-
+**Actual result:**
 ```
+security.protocol = SASL_SSL
 INFO [KafkaServer id=0] started (kafka.server.KafkaServer)
-INFO Registered broker 0 at path /brokers/ids/0 with addresses: ... SASL_SSL ...
 ```
+<img width="1855" height="260" alt="image" src="https://github.com/user-attachments/assets/9b277ac9-b742-4bd9-90ff-e5802d27e94c" />
+
+> **Penjelasan:** `security.protocol = SASL_SSL` membuktikan inter-broker protocol sudah dikonfigurasi SASL_SSL.
+> `[KafkaServer id=0] started` membuktikan broker berhasil start dengan konfigurasi tersebut. ✅
 
 ### Test 2 — Verifikasi Port Listening
 
@@ -1004,12 +1022,15 @@ LISTEN  0  50  *:9092  *:*  users:(("java",...))
 LISTEN  0  50  *:9093  *:*  users:(("java",...))
 LISTEN  0  50  *:9094  *:*  users:(("java",...))
 ```
+<img width="1025" height="136" alt="image" src="https://github.com/user-attachments/assets/46b0ef10-2076-4cb9-8b7a-b57365787b03" />
+
 
 ### Test 3 — SSL Handshake Test
 
 ```bash
 openssl s_client -connect localhost:9093 -tls1_2 </dev/null 2>/dev/null | head -20
 ```
+<img width="1299" height="438" alt="image" src="https://github.com/user-attachments/assets/d0f45ca7-cb40-488d-8794-04a9a4bbf3f1" />
 
 **Expected:** Menampilkan certificate chain dan "SSL handshake has read ... bytes".
 
@@ -1018,6 +1039,7 @@ openssl s_client -connect localhost:9093 -tls1_2 </dev/null 2>/dev/null | head -
 ```bash
 openssl s_client -connect localhost:9094 -tls1_2 </dev/null 2>/dev/null | head -5
 ```
+<img width="1258" height="145" alt="image" src="https://github.com/user-attachments/assets/fb867ef5-b1a0-4199-bd28-5f0b45fb537b" />
 
 **Expected:** SSL connection established (SASL authentication belum dilakukan, tapi SSL layer berjalan).
 
@@ -1026,6 +1048,7 @@ openssl s_client -connect localhost:9094 -tls1_2 </dev/null 2>/dev/null | head -
 ```bash
 kafka-broker-api-versions --bootstrap-server localhost:9092
 ```
+<img width="1061" height="198" alt="image" src="https://github.com/user-attachments/assets/46b179d8-07d2-4348-8e86-44e889113a78" />
 
 **Expected:** Menampilkan daftar API versions. PLAINTEXT masih aktif karena belum dihapus.
 
