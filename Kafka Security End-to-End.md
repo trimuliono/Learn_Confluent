@@ -1074,6 +1074,7 @@ security.protocol=SSL
 ssl.truststore.location=/etc/kafka/secrets/kafka.server.truststore.jks
 ssl.truststore.password=password
 ```
+<img width="1236" height="142" alt="image" src="https://github.com/user-attachments/assets/be92c4b4-a504-483b-b7d5-e008c3728877" />
 
 ### File: `client-sasl-ssl.properties` (SASL + SSL — Recommended)
 
@@ -1087,6 +1088,7 @@ sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule require
   username="user1" \
   password="user1-secret";
 ```
+<img width="1542" height="233" alt="image" src="https://github.com/user-attachments/assets/f2965d34-64d5-4189-9024-41c509c35a29" />
 
 ### File: `admin-sasl-ssl.properties` (Admin User)
 
@@ -1100,6 +1102,7 @@ sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule require
   username="admin" \
   password="admin-secret";
 ```
+<img width="1511" height="208" alt="image" src="https://github.com/user-attachments/assets/dbd71594-ba44-4e6d-bcfc-32a34cdc7c69" />
 
 ## 5.2 (Opsional) Hapus PLAINTEXT Listener
 
@@ -1169,6 +1172,7 @@ kafka-console-producer \
 ERROR: SSL handshake failed
 org.apache.kafka.common.errors.SslAuthenticationException
 ```
+<img width="1849" height="220" alt="image" src="https://github.com/user-attachments/assets/e519220a-5bec-4be6-bd27-1bd8e8ba08f3" />
 
 **Penjelasan:** Client mencoba connect ke SSL port tanpa truststore, sehingga tidak bisa verifikasi certificate broker.
 
@@ -1178,7 +1182,7 @@ org.apache.kafka.common.errors.SslAuthenticationException
 kafka-console-producer \
   --bootstrap-server localhost:9093 \
   --topic test-topic \
-  --producer.config client-ssl.properties
+  --producer.config /etc/kafka/client-ssl.properties
 ```
 
 **Expected:** Producer prompt muncul, bisa mengetik pesan.
@@ -1188,6 +1192,7 @@ kafka-console-producer \
 >Test message
 >
 ```
+<img width="1837" height="123" alt="image" src="https://github.com/user-attachments/assets/cee4c916-1dc8-4cfb-8d81-b86bdf14a453" />
 
 ### Test 3 — SASL_SSL Tanpa Credential (Harus Gagal)
 
@@ -1203,6 +1208,7 @@ kafka-console-producer \
 ERROR: SASL authentication failed
 org.apache.kafka.common.errors.SaslAuthenticationException: Authentication failed
 ```
+<img width="1862" height="324" alt="image" src="https://github.com/user-attachments/assets/2a176ad7-5eab-4b27-a94e-e5da84f17e9a" />
 
 **Penjelasan:** Client tidak menyediakan username/password untuk SASL authentication.
 
@@ -1211,6 +1217,7 @@ org.apache.kafka.common.errors.SaslAuthenticationException: Authentication faile
 Buat file `client-wrong.properties`:
 
 ```properties
+sudo tee -a /etc/kafka/client-wrong.properties << 'EOF'
 security.protocol=SASL_SSL
 sasl.mechanism=PLAIN
 ssl.truststore.location=/etc/kafka/secrets/kafka.server.truststore.jks
@@ -1219,13 +1226,14 @@ ssl.truststore.password=password
 sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required \
   username="user1" \
   password="wrong-password";
+EOF
 ```
 
 ```bash
 kafka-console-producer \
   --bootstrap-server localhost:9094 \
   --topic test-topic \
-  --producer.config client-wrong.properties
+  --producer.config /etc/kafka/client-wrong.properties
 ```
 
 **Expected:**
@@ -1234,13 +1242,15 @@ kafka-console-producer \
 ERROR: Authentication failed: Invalid username or password
 ```
 
+<img width="1852" height="292" alt="image" src="https://github.com/user-attachments/assets/9ec1c4b0-2060-49a3-91ea-800d3942dd59" />
+
 ### Test 5 — SASL_SSL Dengan Credential Benar (Harus Berhasil)
 
 ```bash
 kafka-console-producer \
   --bootstrap-server localhost:9094 \
   --topic test-topic \
-  --producer.config client-sasl-ssl.properties
+  --producer.config /etc/kafka/client-sasl-ssl.properties
 ```
 
 **Expected:** Producer prompt muncul.
@@ -1250,6 +1260,8 @@ kafka-console-producer \
 >Authenticated message
 >
 ```
+<img width="1849" height="112" alt="image" src="https://github.com/user-attachments/assets/7d780a04-0c37-4d25-acf4-03f94c6982ce" />
+
 
 ### Test 6 — Consume via SASL_SSL
 
@@ -1258,16 +1270,18 @@ kafka-console-consumer \
   --bootstrap-server localhost:9094 \
   --topic test-topic \
   --from-beginning \
-  --consumer.config client-sasl-ssl.properties
+  --consumer.config /etc/kafka/client-sasl-ssl.properties
 ```
 
 **Expected:** Pesan yang diproduce sebelumnya muncul.
+
+<img width="753" height="232" alt="image" src="https://github.com/user-attachments/assets/86dcdcbf-6097-4bc5-a334-ac2fc8b4a963" />
 
 ### Test 7 — Verifikasi User yang Berbeda
 
 ```bash
 # Buat properties untuk user2
-cat > client-user2.properties << EOF
+sudo tee -a /etc/kafka/client-user2.properties << 'EOF'
 security.protocol=SASL_SSL
 sasl.mechanism=PLAIN
 ssl.truststore.location=/etc/kafka/secrets/kafka.server.truststore.jks
@@ -1282,10 +1296,12 @@ EOF
 kafka-console-producer \
   --bootstrap-server localhost:9094 \
   --topic test-topic \
-  --producer.config client-user2.properties
+  --producer.config /etc/kafka/client-user2.properties
 ```
 
 **Expected:** Berhasil — user2 juga terdaftar di JAAS file.
+
+<img width="1059" height="608" alt="image" src="https://github.com/user-attachments/assets/6653e98b-c126-4401-87ef-8bf9ee3412a9" />
 
 ---
 
