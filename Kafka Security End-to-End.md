@@ -1,4 +1,4 @@
-# 🔐 LAB – Kafka Security End-to-End
+<img width="1235" height="288" alt="image" src="https://github.com/user-attachments/assets/9778c8ea-6f38-49db-ad37-1c969ba75b67" /># 🔐 LAB – Kafka Security End-to-End
 
 ## Confluent Platform 7.9
 
@@ -1673,31 +1673,42 @@ Producer (user1) → Topic: orders → Consumer (user2)
 ```bash
 # user1 hanya boleh Write ke orders
 kafka-acls --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties \
+  --command-config /etc/kafka/admin-sasl-ssl.properties \
   --add --allow-principal User:user1 \
   --operation Write --topic orders
 
 # user2 hanya boleh Read dari orders + group
 kafka-acls --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties \
+  --command-config /etc/kafka/admin-sasl-ssl.properties \
   --add --allow-principal User:user1 \
   --operation Describe --topic orders
 
 kafka-acls --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties \
+  --command-config /etc/kafka/admin-sasl-ssl.properties \
   --add --allow-principal User:user2 \
   --operation Read --topic orders
 
 kafka-acls --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties \
+  --command-config /etc/kafka/admin-sasl-ssl.properties \
   --add --allow-principal User:user2 \
   --operation Describe --topic orders
 
 kafka-acls --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties \
+  --command-config /etc/kafka/admin-sasl-ssl.properties \
   --add --allow-principal User:user2 \
   --operation Read --group order-consumers
 ```
+<img width="1235" height="288" alt="image" src="https://github.com/user-attachments/assets/5504fc47-4fc4-4592-ad99-c09a6a0ea274" />
+
+<img width="1245" height="320" alt="image" src="https://github.com/user-attachments/assets/2a09e168-b5bf-47da-b0c2-a76c5d5e4286" />
+
+<img width="1210" height="351" alt="image" src="https://github.com/user-attachments/assets/443f27ab-7d4d-4783-bebd-e2a94d3cbb8a" />
+
+<img width="1242" height="370" alt="image" src="https://github.com/user-attachments/assets/4ae87525-fd23-42b3-a3c0-c76128bfb26e" />
+
+<img width="1325" height="311" alt="image" src="https://github.com/user-attachments/assets/2e298094-71da-4da3-893e-cc4511cd1ad7" />
+
+
 
 ### Step 2: Create Topic (Admin)
 
@@ -1707,8 +1718,9 @@ kafka-topics --create \
   --topic orders \
   --partitions 3 \
   --replication-factor 1 \
-  --command-config admin-sasl-ssl.properties
+  --command-config /etc/kafka/admin-sasl-ssl.properties
 ```
+<img width="697" height="251" alt="image" src="https://github.com/user-attachments/assets/20cb9bda-8556-4aec-b399-361d1d02149d" />
 
 ### Step 3: Start Consumer (Terminal 1)
 
@@ -1717,7 +1729,7 @@ kafka-console-consumer \
   --bootstrap-server localhost:9094 \
   --topic orders \
   --group order-consumers \
-  --consumer.config client-user2.properties
+  --consumer.config /etc/kafka/client-user2.properties
 ```
 
 ### Step 4: Produce Messages (Terminal 2)
@@ -1726,7 +1738,7 @@ kafka-console-consumer \
 kafka-console-producer \
   --bootstrap-server localhost:9094 \
   --topic orders \
-  --producer.config client-sasl-ssl.properties
+  --producer.config /etc/kafka/client-sasl-ssl.properties
 ```
 
 Ketik:
@@ -1736,10 +1748,14 @@ Ketik:
 {"orderId":"002","product":"Mouse","qty":5}
 {"orderId":"003","product":"Keyboard","qty":2}
 ```
+<img width="732" height="220" alt="image" src="https://github.com/user-attachments/assets/e7589128-d807-416a-bf7a-9afee3db852c" />
+
 
 ### Step 5: Verifikasi
 
 **Di Terminal 1 (consumer):**
+
+<img width="711" height="275" alt="image" src="https://github.com/user-attachments/assets/3e28793e-142f-43b3-b438-b701002701f9" />
 
 ```
 {"orderId":"001","product":"Laptop","qty":1}
@@ -1753,7 +1769,7 @@ Ketik:
 kafka-console-producer \
   --bootstrap-server localhost:9094 \
   --topic orders \
-  --producer.config client-user2.properties
+  --producer.config /etc/kafka/client-user2.properties
 ```
 
 **Expected:**
@@ -1769,8 +1785,9 @@ kafka-console-consumer \
   --bootstrap-server localhost:9094 \
   --topic orders \
   --group test-group \
-  --consumer.config client-sasl-ssl.properties
+  --consumer.config /etc/kafka/client-sasl-ssl.properties
 ```
+<img width="1536" height="602" alt="image" src="https://github.com/user-attachments/assets/dbd71019-49ca-464d-9e71-344bed1a6d5f" />
 
 **Expected:**
 
