@@ -1574,8 +1574,7 @@ kafka-console-producer \
 ```
 <img width="747" height="214" alt="image" src="https://github.com/user-attachments/assets/5ad375f5-8d8a-4072-8c29-73dda5bf8472" />
 
-<img width="744" height="261" alt="image" src="https://github.com/user-attachments/assets/d7adc2c0-62f1-4120-abaf-a9d92fa9509a" />
-
+<img width="713" height="194" alt="image" src="https://github.com/user-attachments/assets/13215a02-2185-409a-b18b-c600f709d208" />
 
 **Expected:** Kedua produce berhasil karena wildcard `'*'` mencakup semua topic.
 
@@ -1771,6 +1770,7 @@ kafka-console-producer \
   --topic orders \
   --producer.config /etc/kafka/client-user2.properties
 ```
+<img width="1542" height="334" alt="image" src="https://github.com/user-attachments/assets/31c9276d-af31-40b2-84d3-189d128eef2e" />
 
 **Expected:**
 
