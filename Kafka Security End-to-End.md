@@ -1,4 +1,4 @@
-<img width="1235" height="288" alt="image" src="https://github.com/user-attachments/assets/9778c8ea-6f38-49db-ad37-1c969ba75b67" /># 🔐 LAB – Kafka Security End-to-End
+# 🔐 LAB – Kafka Security End-to-End
 
 ## Confluent Platform 7.9
 
