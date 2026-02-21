@@ -1326,6 +1326,7 @@ authorizer.class.name=kafka.security.authorizer.AclAuthorizer
 super.users=User:admin
 allow.everyone.if.no.acl.found=false
 ```
+<img width="965" height="299" alt="image" src="https://github.com/user-attachments/assets/7ced333c-2fd7-4fac-8cd4-aa7954996c90" />
 
 **Penjelasan:**
 
@@ -1351,8 +1352,9 @@ kafka-topics --create \
   --topic secure-topic \
   --partitions 3 \
   --replication-factor 1 \
-  --command-config admin-sasl-ssl.properties
+  --command-config /etc/kafka/admin-sasl-ssl.properties
 ```
+<img width="694" height="221" alt="image" src="https://github.com/user-attachments/assets/f0eb8836-a6f8-4802-aa0e-6a586f236e9e" />
 
 > **Penting:** Gunakan `admin-sasl-ssl.properties` karena sekarang hanya super user yang bisa create topic.
 
@@ -1366,8 +1368,9 @@ kafka-topics --create \
 kafka-console-producer \
   --bootstrap-server localhost:9094 \
   --topic secure-topic \
-  --producer.config client-sasl-ssl.properties
+  --producer.config /etc/kafka/client-sasl-ssl.properties
 ```
+<img width="770" height="173" alt="image" src="https://github.com/user-attachments/assets/40bd6fef-853e-4366-a1d6-a9e000b9a8a2" />
 
 **Expected:**
 
@@ -1385,18 +1388,20 @@ org.apache.kafka.common.errors.TopicAuthorizationException:
 
 ```bash
 kafka-acls --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties \
+  --command-config /etc/kafka/admin-sasl-ssl.properties \
   --add --allow-principal User:user1 \
   --operation Write --topic secure-topic
 ```
+<img width="1277" height="287" alt="image" src="https://github.com/user-attachments/assets/66b10d9d-221f-42a4-a2db-ba9d17ef99c3" />
 
 Verifikasi ACL:
 
 ```bash
 kafka-acls --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties \
+  --command-config /etc/kafka/admin-sasl-ssl.properties \
   --list --topic secure-topic
 ```
+<img width="1311" height="191" alt="image" src="https://github.com/user-attachments/assets/d60d3bf2-8df3-4157-b372-0ddf100b9471" />
 
 **Expected output:**
 
@@ -1411,8 +1416,9 @@ Test produce:
 kafka-console-producer \
   --bootstrap-server localhost:9094 \
   --topic secure-topic \
-  --producer.config client-sasl-ssl.properties
+  --producer.config /etc/kafka/client-sasl-ssl.properties
 ```
+<img width="757" height="177" alt="image" src="https://github.com/user-attachments/assets/7eb2492d-3934-468e-be6c-378938556e80" />
 
 **Expected:** Berhasil mengirim pesan.
 
@@ -1430,8 +1436,9 @@ kafka-console-consumer \
   --topic secure-topic \
   --from-beginning \
   --group test-group \
-  --consumer.config client-sasl-ssl.properties
+  --consumer.config /etc/kafka/client-sasl-ssl.properties
 ```
+<img width="1537" height="285" alt="image" src="https://github.com/user-attachments/assets/8740cd29-6a73-4e0e-a19e-8284630eaa17" />
 
 **Expected:**
 
@@ -1448,16 +1455,17 @@ ERROR: Topic authorization failed (Read operation not allowed)
 ```bash
 # Add Read untuk topic
 kafka-acls --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties \
+  --command-config /etc/kafka/admin-sasl-ssl.properties \
   --add --allow-principal User:user1 \
   --operation Read --topic secure-topic
 
 # Add Read untuk consumer group
 kafka-acls --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties \
+  --command-config /etc/kafka/admin-sasl-ssl.properties \
   --add --allow-principal User:user1 \
   --operation Read --group test-group
 ```
+<img width="1290" height="548" alt="image" src="https://github.com/user-attachments/assets/6546395a-5fe6-4bb2-a86e-9c4c8d70cf25" />
 
 > **Penting:** Consumer memerlukan DUA ACL — Read pada topic DAN Read pada consumer group. Tanpa group ACL, consumer tidak bisa join group.
 
@@ -1469,8 +1477,9 @@ kafka-console-consumer \
   --topic secure-topic \
   --from-beginning \
   --group test-group \
-  --consumer.config client-sasl-ssl.properties
+  --consumer.config /etc/kafka/client-sasl-ssl.properties
 ```
+<img width="367" height="119" alt="image" src="https://github.com/user-attachments/assets/823fdf78-d502-4c89-a11e-a36c20240dec" />
 
 **Expected:** Berhasil membaca pesan yang sudah diproduce.
 
@@ -1485,18 +1494,20 @@ Pesan kedua dari user1
 
 ```bash
 kafka-acls --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties \
+  --command-config /etc/kafka/admin-sasl-ssl.properties \
   --add --deny-principal User:user1 \
   --operation Write --topic secure-topic
 ```
+<img width="1319" height="327" alt="image" src="https://github.com/user-attachments/assets/5fa98c36-4fb1-493e-8c22-58c737b1f3af" />
 
 Verifikasi ACL:
 
 ```bash
 kafka-acls --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties \
+  --command-config /etc/kafka/admin-sasl-ssl.properties \
   --list --topic secure-topic
 ```
+<img width="1305" height="245" alt="image" src="https://github.com/user-attachments/assets/c62b5d24-635d-4987-b94e-4caf72d828e5" />
 
 **Expected output:**
 
@@ -1512,8 +1523,9 @@ Test produce:
 kafka-console-producer \
   --bootstrap-server localhost:9094 \
   --topic secure-topic \
-  --producer.config client-sasl-ssl.properties
+  --producer.config /etc/kafka/client-sasl-ssl.properties
 ```
+<img width="1534" height="567" alt="image" src="https://github.com/user-attachments/assets/353cffa3-5c13-49c0-86ac-9898c1e5207f" />
 
 **Expected:**
 
@@ -1527,10 +1539,11 @@ Cleanup — hapus deny agar test selanjutnya berjalan:
 
 ```bash
 kafka-acls --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties \
+  --command-config /etc/kafka/admin-sasl-ssl.properties \
   --remove --deny-principal User:user1 \
   --operation Write --topic secure-topic
 ```
+<img width="1301" height="357" alt="image" src="https://github.com/user-attachments/assets/04017694-f491-47eb-a0f3-2f2f2c0ac1b0" />
 
 ---
 
@@ -1538,10 +1551,11 @@ kafka-acls --bootstrap-server localhost:9094 \
 
 ```bash
 kafka-acls --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties \
+  --command-config /etc/kafka/admin-sasl-ssl.properties \
   --add --allow-principal User:user2 \
   --operation Read --operation Write --topic '*'
 ```
+<img width="1214" height="336" alt="image" src="https://github.com/user-attachments/assets/b0e49325-84c8-4aa5-9bc5-85e86b898caa" />
 
 Test:
 
@@ -1550,14 +1564,18 @@ Test:
 kafka-console-producer \
   --bootstrap-server localhost:9094 \
   --topic secure-topic \
-  --producer.config client-user2.properties
+  --producer.config /etc/kafka/client-user2.properties
 
 # user2 produce ke topic lain
 kafka-console-producer \
   --bootstrap-server localhost:9094 \
-  --topic another-topic \
-  --producer.config client-user2.properties
+  --topic test-topic \
+  --producer.config /etc/kafka/client-user2.properties
 ```
+<img width="747" height="214" alt="image" src="https://github.com/user-attachments/assets/5ad375f5-8d8a-4072-8c29-73dda5bf8472" />
+
+<img width="744" height="261" alt="image" src="https://github.com/user-attachments/assets/d7adc2c0-62f1-4120-abaf-a9d92fa9509a" />
+
 
 **Expected:** Kedua produce berhasil karena wildcard `'*'` mencakup semua topic.
 
@@ -1574,8 +1592,9 @@ kafka-topics --create \
   --topic user1-topic \
   --partitions 1 \
   --replication-factor 1 \
-  --command-config client-sasl-ssl.properties
+  --command-config /etc/kafka/client-sasl-ssl.properties
 ```
+<img width="1447" height="302" alt="image" src="https://github.com/user-attachments/assets/31bb1346-4c5c-48e6-926f-d92041f8ee01" />
 
 **Expected:**
 
@@ -1586,10 +1605,11 @@ ERROR: Cluster authorization failed.
 ```bash
 # Tambahkan Cluster Create ACL
 kafka-acls --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties \
+  --command-config /etc/kafka/admin-sasl-ssl.properties \
   --add --allow-principal User:user1 \
   --operation Create --cluster
 ```
+<img width="1308" height="299" alt="image" src="https://github.com/user-attachments/assets/37dba552-e603-4a86-be26-10e6d768a305" />
 
 ```bash
 # Coba lagi
@@ -1598,8 +1618,9 @@ kafka-topics --create \
   --topic user1-topic \
   --partitions 1 \
   --replication-factor 1 \
-  --command-config client-sasl-ssl.properties
+  --command-config /etc/kafka/client-sasl-ssl.properties
 ```
+<img width="708" height="225" alt="image" src="https://github.com/user-attachments/assets/ebb59ca7-8bd0-4da9-9f23-e85a0de13c44" />
 
 **Expected:**
 
@@ -1615,8 +1636,10 @@ Created topic user1-topic.
 # Admin bisa melakukan apapun tanpa ACL
 kafka-topics --list \
   --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties
+  --command-config /etc/kafka/admin-sasl-ssl.properties
 ```
+<img width="1143" height="700" alt="image" src="https://github.com/user-attachments/assets/8cbb1a76-e56e-421f-b34d-aeccf0b583a3" />
+
 
 **Expected:** Semua topic terlisting — admin bypass semua ACL.
 
@@ -1626,9 +1649,10 @@ kafka-topics --list \
 
 ```bash
 kafka-acls --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties \
+  --command-config /etc/kafka/admin-sasl-ssl.properties \
   --list
 ```
+<img width="1312" height="452" alt="image" src="https://github.com/user-attachments/assets/75424711-91b0-45f4-9310-4d85fa0b4052" />
 
 **Expected:** Menampilkan semua ACL yang sudah dibuat.
 
