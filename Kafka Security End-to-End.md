@@ -1949,7 +1949,7 @@ ps aux | grep java.security.auth.login.config
 ```bash
 # List semua ACL
 kafka-acls --bootstrap-server localhost:9094 \
-  --command-config admin-sasl-ssl.properties \
+  --command-config /etc/kafka/admin-sasl-ssl.properties \
   --list
 ```
 
