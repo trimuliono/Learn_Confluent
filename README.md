@@ -1,105 +1,149 @@
 # Learn Confluent
 
-### Apache Kafka & Confluent Platform 7.9.x Hands-On Lab Series
+### Enterprise Event Streaming Lab – Confluent Platform 7.9.x
 
-This repository documents a structured hands-on learning journey for mastering **Apache Kafka** and **Confluent Platform 7.9.x**, from foundational setup to end-to-end event streaming architecture.
+This repository documents a structured, hands-on engineering journey for mastering Apache Kafka and Confluent Platform 7.9.x — from installation, to end-to-end streaming implementation, security hardening, and automation.
 
-The project is designed to simulate real-world implementation scenarios, focusing on installation, configuration, integration, and stream processing using Confluent ecosystem components.
-
----
-
-## 📌 Project Overview
-
-This learning series is divided into phases:
-
-| Phase   | Focus Area                                   | Outcome                                          |
-| ------- | -------------------------------------------- | ------------------------------------------------ |
-| Phase 1 | Platform Installation & Core Services        | Fully operational single-node Confluent Platform |
-| Phase 2 | End-to-End Streaming (Avro, Connect, ksqlDB) | Complete streaming data pipeline                 |
-
-Each phase includes hands-on implementation and technical documentation.
+The project is organized into three progressive phases that simulate real-world enterprise delivery practices.
 
 ---
 
-# 🔹 Phase 1 – Confluent Platform Installation & Exploration
+# 📌 Project Phases
 
-**Objective:**
-Deploy and validate a complete Confluent Platform 7.9.x environment.
+---
 
-### Covered Components
+## 🔹 Phase 1 – Confluent Platform Installation
 
-* Zookeeper
-* Kafka Broker
-* Schema Registry
-* Kafka Connect
-* ksqlDB
-* Kafka REST Proxy
-* Control Center
+**Objective:** Deploy and validate a fully functional Confluent Platform cluster.
 
-### Key Activities
+### Scope
 
-* Installation via package manager
-* Service deployment using systemd
-* Cluster validation (quorum & cluster ID check)
+* Install Confluent Platform 7.9.x via package manager
+* Configure and start:
+
+  * Zookeeper
+  * Kafka Broker
+  * Schema Registry
+  * Kafka Connect
+  * ksqlDB
+  * Kafka REST Proxy
+  * Control Center
+* Deploy services using systemd
+* Validate quorum & cluster ID
 * Topic creation
 * CLI producer & consumer testing
-* Full service health verification
 
-📄 Documentation:
+📂 Location:
 
 ```
-Installing CP 7.9.x Via package manager.md
+phase-1-installation/
+└── Installing CP 7.9.x Via package manager.md
 ```
 
 ---
 
-# 🔹 Phase 2 – End-to-End Streaming Pipeline
+## 🔹 Phase 2 – End-to-End Streaming & Security
 
-**Objective:**
-Build a real streaming architecture using Avro, Kafka Connect, and ksqlDB.
+**Objective:** Build a complete streaming pipeline, validate it, then apply enterprise-grade security controls.
 
-### Architecture Scope
+---
 
-* Avro-based message serialization
+### 🧩 Part 1 – End-to-End Streaming (Baseline Implementation)
+
+This stage establishes a fully working data pipeline in a non-secure environment before introducing encryption and authentication.
+
+#### End-to-End Streaming Lab
+
+* Avro serialization
 * Schema Registry integration
-* Source Connector
-* Sink Connector
-* Stream processing using ksqlDB
-* End-to-end data flow validation
+* Kafka Connect (source & sink)
+* ksqlDB stream processing
+* Complete streaming pipeline validation
 
-### Implementation Highlights
-
-* Topic creation with Avro schema
-* Producer & Consumer with schema validation
-* Kafka Connect source & sink configuration
-* Stream transformation using ksqlDB
-* Data pipeline verification
-
-📄 Documentation:
+📂 Location:
 
 ```
-CP 7.9.x-avro-connect-ksqldb-end-to-end-streaming-lab.md
+phase-2-security/
+└── CP 7.9.x-avro-connect-ksqldb-end-to-end-streaming-lab.md
+```
+
+This ensures the architecture and data flow are validated before security layers are introduced.
+
+---
+
+### 🔐 Part 2 – Security Hardening
+
+After validating the functional pipeline, security controls are applied across all components.
+
+#### Security Implementation
+
+* TLS encryption
+* SASL authentication
+* Zookeeper security
+* Inter-broker security
+* Client security
+* ACL configuration
+* Secure produce & consume validation
+
+📂 Location:
+
+```
+phase-2-security/
+└── Kafka Security End-to-End.md
 ```
 
 ---
 
-# 🏗 Architecture Summary
+## 🔹 Phase 3 – Automation & Operational Engineering
 
-This repository demonstrates an event streaming architecture composed of:
+**Objective:** Automate deployment and simulate production-grade operational practices.
+
+### Scope
+
+* Ansible fundamentals
+* Automated deployment (non-secure)
+* Automated secure deployment
+* Secret management using Ansible Vault
+* Monitoring integration
+* Troubleshooting scenarios
+
+📂 Location:
 
 ```
-Producer → Kafka Topic (Avro) → 
-Schema Registry → 
-Kafka Connect (Source/Sink) → 
-ksqlDB Stream Processing → 
-Downstream System
+phase-3-automation/
+├── 01-ansible-basics.md
+├── 02-deploy-cp-no-security.md
+├── 03-deploy-cp-secure.md
+├── 04-ansible-vault.md
+├── 05-monitoring.md
+└── 06-troubleshooting-scenarios.md
 ```
-
-The setup reflects real enterprise streaming patterns using Confluent Platform components.
 
 ---
 
-# 🛠 Technical Stack
+# 🏗 Architecture Overview
+
+The project demonstrates a complete Confluent-based streaming architecture:
+
+```
+Producer
+   ↓
+Kafka Broker (Avro)
+   ↓
+Schema Registry
+   ↓
+Kafka Connect (Source / Sink)
+   ↓
+ksqlDB Stream Processing
+   ↓
+Downstream Systems
+```
+
+Security and automation layers are progressively applied after validating the functional baseline.
+
+---
+
+# 🛠 Technology Stack
 
 * Confluent Platform 7.9.x
 * Apache Kafka
@@ -107,53 +151,23 @@ The setup reflects real enterprise streaming patterns using Confluent Platform c
 * Schema Registry
 * Kafka Connect
 * ksqlDB
-* Avro Serialization
-* Linux (systemd-based deployment)
+* Avro
+* TLS / SASL
+* ACL
+* Ansible
+* Linux (systemd-based services)
 
 ---
 
-# 🎯 Learning Outcomes
+# 🎯 Engineering Outcomes
 
-After completing this project, the practitioner will be able to:
+After completing all three phases, this project demonstrates the ability to:
 
-* Install and configure Confluent Platform from scratch
-* Understand Kafka cluster architecture
-* Manage Kafka topics and brokers
-* Implement Avro schema management
-* Build streaming pipelines using Kafka Connect
-* Perform stream processing with ksqlDB
-* Validate and troubleshoot Kafka services
-
----
-
-# 📂 Repository Structure
-
-```
-Learn_Confluent/
-│
-├── Introduction.md
-├── Lab 01 Exploring Apache Kafka.md
-├── Installing CP 7.9.x Via package manager.md
-├── CP 7.9.x-avro-connect-ksqldb-end-to-end-streaming-lab.md
-└── README.md
-```
-
----
-
-# 🚀 Future Enhancements
-
-Planned improvements for upcoming phases:
-
-* TLS & SASL Security implementation
-* ACL configuration
-* Multi-broker cluster setup
-* Monitoring & observability integration
-* Production-grade deployment patterns
-
----
-
-# 👤 Author
-
-Self-paced hands-on implementation as part of continuous learning in event streaming and distributed systems.
+* Deploy and manage Confluent Platform
+* Build and validate an end-to-end streaming pipeline
+* Implement Kafka security (TLS, SASL, ACL)
+* Automate infrastructure using Ansible
+* Apply monitoring and troubleshooting practices
+* Structure technical documentation in a production-ready format
 
 ---
