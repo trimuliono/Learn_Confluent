@@ -111,7 +111,7 @@ phase-2-security/
 
 ```
 phase-3-automation/
-├── 01-ansible-basics.md
+├── 01-Install Ansible on Ansible Control Node.md
 ├── 02-deploy-cp-no-security.md
 ├── 03-deploy-cp-secure.md
 ├── 04-ansible-vault.md
