@@ -862,8 +862,6 @@ ansible-playbook -i inventory/hosts.yml confluent.yml --syntax-check
 ```
 <img width="1341" height="468" alt="image" src="https://github.com/user-attachments/assets/0c81dae3-412a-4813-8a52-148663017ccd" />
 
-> **WARNING** tentang `zookeeper_parallel`, `zookeeper_serial`, dll — ini normal, hanya informasi bahwa Confluent Ansible collection mengharapkan subgroup tersebut tapi tidak wajib dibuat manual.
-
 Output yang diharapkan:
 ```
 playbook: confluent.yml
@@ -876,7 +874,7 @@ playbook: confluent.yml
   play #7 (kafka_rest): Kafka REST Proxy
   play #8 (control_center): Control Center
 ```
-
+> **WARNING** tentang `zookeeper_parallel`, `zookeeper_serial`, dll — ini normal, hanya informasi bahwa Confluent Ansible collection mengharapkan subgroup tersebut tapi tidak wajib dibuat manual.
 > **Jika ada error syntax**, Ansible akan menampilkan baris dan file yang bermasalah. Perbaiki sebelum lanjut.
 
 ### 5b. Test Konektivitas SSH ke Semua Node
@@ -930,3 +928,35 @@ root
 cp-ansible | CHANGED | rc=0 >>
 root
 ```
+
+### 5d. Verifikasi Variabel Efektif
+
+```bash
+# Lihat variabel yang akan dipakai untuk cp-node1
+ansible -i inventory/hosts.yml cp-node1 -m debug \
+  -a "var=confluent_package_version,ssl_enabled,sasl_protocol" \
+  -e "@vars/platform.yml"
+```
+
+<img width="1105" height="175" alt="image" src="https://github.com/user-attachments/assets/8a195b82-04f5-4e28-a529-200ff099363c" />
+
+Output yang diharapkan:
+```json
+{
+    "confluent_package_version": "7.9.5",
+    "ssl_enabled": false,
+    "sasl_protocol": "none"
+}
+```
+
+### 5e. Cek Disk Space di Semua Node
+
+```bash
+# Pastikan ada cukup disk space (minimal 10GB per node untuk full install)
+ansible -i inventory/hosts.yml all -m shell \
+  -a "df -h / | tail -1"
+```
+
+<img width="1048" height="295" alt="image" src="https://github.com/user-attachments/assets/e26c53c9-d44e-49f2-b109-909bf14d1a44" />
+
+---
