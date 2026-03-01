@@ -960,3 +960,122 @@ ansible -i inventory/hosts.yml all -m shell \
 <img width="1048" height="295" alt="image" src="https://github.com/user-attachments/assets/e26c53c9-d44e-49f2-b109-909bf14d1a44" />
 
 ---
+
+## Step 6: Jalankan Deployment
+
+> ⚠️ **Pastikan semua verifikasi di Step 5 berhasil sebelum menjalankan ini.**
+> Proses deployment full stack membutuhkan **20–45 menit** tergantung kecepatan internet untuk download package.
+
+```bash
+cd ~/confluent-ansible
+
+ansible-playbook -i inventory/hosts.yml confluent.yml
+```
+
+**Jalankan dengan verbose jika ada masalah:**
+
+```bash
+# -v: task info
+# -vv: + variabel
+# -vvv: + SSH detail
+ansible-playbook -i inventory/hosts.yml confluent.yml -vv 2>&1 | tee ~/deployment.log
+```
+
+**Jalankan hanya komponen tertentu (via tags):**
+
+```bash
+# Hanya deploy ZooKeeper dan Kafka
+ansible-playbook -i inventory/hosts.yml confluent.yml \
+  --tags zookeeper,kafka_broker
+
+# Hanya deploy Schema Registry
+ansible-playbook -i inventory/hosts.yml confluent.yml \
+  --tags schema_registry
+
+# Hanya deploy Control Center
+ansible-playbook -i inventory/hosts.yml confluent.yml \
+  --tags control_center
+```
+
+### Proses yang Terjadi Selama Deployment
+
+Ansible akan menjalankan task secara berurutan untuk setiap komponen:
+
+**Fase ZooKeeper (di cp-node1, cp-node2, cp-node3):**
+```
+TASK [Install ZooKeeper Package] ............... changed
+TASK [Create ZooKeeper Data Directory] ......... changed
+TASK [Create ZooKeeper myid File] .............. changed
+TASK [Write ZooKeeper Configuration] ........... changed
+TASK [Enable ZooKeeper Service] ................ changed
+TASK [Start ZooKeeper Service] ................. changed
+TASK [Wait for ZooKeeper Port 2181] ............ ok
+```
+
+**Fase Kafka Broker (di cp-node1, cp-node2, cp-node3):**
+```
+TASK [Install Kafka Broker Package] ............ changed
+TASK [Write server.properties] ................. changed
+TASK [Enable Kafka Service] .................... changed
+TASK [Start Kafka Service] ..................... changed
+TASK [Wait for Kafka Port 9092] ................ ok
+TASK [Wait for Kafka Broker to be Registered] .. ok
+```
+
+**Fase Schema Registry (di cp-node1, cp-node2, cp-node3):**
+```
+TASK [Install Schema Registry Package] ......... changed
+TASK [Write schema-registry.properties] ........ changed
+TASK [Start Schema Registry Service] ........... changed
+TASK [Wait for Schema Registry Port 8081] ...... ok
+```
+
+**Fase Kafka Connect (di cp-node1, cp-node2, cp-node3):**
+```
+TASK [Install Kafka Connect Package] ........... changed
+TASK [Write connect-distributed.properties] .... changed
+TASK [Create Internal Topics for Connect] ...... changed
+TASK [Start Kafka Connect Service] ............. changed
+TASK [Wait for Kafka Connect Port 8083] ........ ok
+```
+
+**Fase ksqlDB (di cp-node1, cp-node2, cp-node3):**
+```
+TASK [Install ksqlDB Package] .................. changed
+TASK [Write ksql-server.properties] ............ changed
+TASK [Start ksqlDB Service] .................... changed
+TASK [Wait for ksqlDB Port 8088] ............... ok
+```
+
+**Fase REST Proxy (di cp-node1, cp-node2, cp-node3):**
+```
+TASK [Install REST Proxy Package] .............. changed
+TASK [Write kafka-rest.properties] ............. changed
+TASK [Start REST Proxy Service] ................ changed
+TASK [Wait for REST Proxy Port 8082] ........... ok
+```
+
+**Fase Control Center (di cp-ansible):**
+```
+TASK [Install Control Center Package] .......... changed
+TASK [Write control-center.properties] ......... changed
+TASK [Start Control Center Service] ............ changed
+TASK [Wait for Control Center Port 9021] ....... ok
+```
+
+### Output Deployment yang Normal
+
+```
+PLAY RECAP *****************************************************
+cp-ansible  : ok=45   changed=30   unreachable=0   failed=0
+cp-node1    : ok=180  changed=120  unreachable=0   failed=0
+cp-node2    : ok=180  changed=120  unreachable=0   failed=0
+cp-node3    : ok=180  changed=120  unreachable=0   failed=0
+```
+<img width="1526" height="193" alt="image" src="https://github.com/user-attachments/assets/1e5ff65c-76a1-4871-8c8e-7868f99e4714" />
+
+
+✅ **Deployment berhasil jika `failed=0` dan `unreachable=0` untuk semua node.**
+
+---
+
