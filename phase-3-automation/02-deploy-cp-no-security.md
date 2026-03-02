@@ -1684,6 +1684,8 @@ curl -X POST \
   }' \
   http://cp-node1:8082/topics/orders-raw
 ```
+<img width="1862" height="310" alt="image" src="https://github.com/user-attachments/assets/ffb48f89-e1d3-49b5-97a9-11fc6affd1b6" />
+
 
 **Langkah 4:** Konsumsi hanya order premium (dari cp-node1):
 
