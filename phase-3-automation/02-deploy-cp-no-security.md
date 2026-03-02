@@ -1078,4 +1078,782 @@ cp-node3    : ok=180  changed=120  unreachable=0   failed=0
 ✅ **Deployment berhasil jika `failed=0` dan `unreachable=0` untuk semua node.**
 
 ---
+## Pengujian dan Verifikasi Deployment
 
+---
+
+### Test 1: Verifikasi Status Semua Service Sekaligus
+
+Jalankan dari `cp-ansible` menggunakan script berikut:
+
+```bash
+cd ~/confluent-ansible
+
+cat > /tmp/check_services.sh << 'EOF'
+#!/bin/bash
+echo "========================================"
+echo " Confluent Platform Service Status Check"
+echo "========================================"
+
+SERVICES=(
+  "confluent-zookeeper"
+  "confluent-server"
+  "confluent-schema-registry"
+  "confluent-kafka-connect"
+  "confluent-ksqldb"
+  "confluent-kafka-rest"
+)
+
+for svc in "${SERVICES[@]}"; do
+  STATUS=$(systemctl is-active $svc 2>/dev/null)
+  if [ "$STATUS" = "active" ]; then
+    echo "✅ $svc: RUNNING"
+  else
+    echo "❌ $svc: $STATUS"
+  fi
+done
+EOF
+```
+```
+# Jalankan script di semua data nodes
+ansible -i inventory/hosts.yml zookeeper -m script -a /tmp/check_services.sh
+
+# Cek Control Center di cp-ansible
+ansible -i inventory/hosts.yml control_center \
+  -m shell -a "systemctl is-active confluent-control-center"
+```
+<img width="1558" height="557" alt="image" src="https://github.com/user-attachments/assets/147cd107-9175-41a8-8b71-939ec0a98109" />
+
+<img width="1509" height="121" alt="image" src="https://github.com/user-attachments/assets/95e6c1ba-cfbc-4682-919c-bc48d7274105" />
+
+> **⚠️ Catatan Nama Service:** Nama service Kafka Broker di Confluent Platform adalah `confluent-server`, **bukan** `confluent-kafka`. Pastikan script menggunakan nama yang benar.
+
+Output yang diharapkan di setiap data node:
+
+```
+✅ confluent-zookeeper: RUNNING
+✅ confluent-server: RUNNING
+✅ confluent-schema-registry: RUNNING
+✅ confluent-kafka-connect: RUNNING
+✅ confluent-ksqldb: RUNNING
+✅ confluent-kafka-rest: RUNNING
+```
+
+---
+
+### Test 2: Verifikasi Port Listening di Semua Node
+
+```bash
+# Cek semua port Confluent di semua data nodes
+ansible -i ~/confluent-ansible/inventory/hosts.yml zookeeper \
+  -m shell -a "ss -tlnp | grep -E '2181|2888|3888|9092|8081|8082|8083|8088' | awk '{print \$4, \$6}'"
+```
+
+Output yang diharapkan per node (port 2888 hanya muncul di node ZooKeeper leader):
+
+```
+*:3888  users:(("java",...))   # ZooKeeper leader election
+*:2181  users:(("java",...))   # ZooKeeper client
+*:9092  users:(("java",...))   # Kafka Broker
+*:8081  users:(("java",...))   # Schema Registry
+*:8082  users:(("java",...))   # REST Proxy
+*:8083  users:(("java",...))   # Kafka Connect
+*:8088  users:(("java",...))   # ksqlDB
+```
+
+> **Catatan:** Port `2888` (ZooKeeper peer) hanya akan muncul di node yang menjadi ZooKeeper **leader**. Node follower tidak membuka port ini secara aktif.
+
+```bash
+# Cek port Control Center di cp-ansible
+ansible -i ~/confluent-ansible/inventory/hosts.yml control_center \
+  -m shell -a "ss -tlnp | grep 9021 | awk '{print \$4, \$6}'"
+```
+
+---
+
+### Test 3: ZooKeeper Health Check
+
+> **⚠️ Catatan:** Confluent Platform menonaktifkan ZooKeeper 4-letter words (`ruok`, `stat`, `mntr`) secara default karena alasan keamanan. Gunakan `srvr` sebagai pengganti atau gunakan `zookeeper-shell`.
+
+```bash
+# Cek ZooKeeper menggunakan srvr (tersedia meski 4lw lain dinonaktifkan)
+for node in cp-node1 cp-node2 cp-node3; do
+  echo "=== $node ==="
+  echo "srvr" | nc $node 2181 | grep -E "Zookeeper version|Mode|Node count"
+  echo ""
+done
+```
+
+Output yang diharapkan:
+
+<img width="1039" height="374" alt="image" src="https://github.com/user-attachments/assets/59471948-204f-4d74-adb3-0785a5e6e6af" />
+
+```
+=== cp-node1 ===
+Zookeeper version: 3.8.4-...
+Mode: follower
+Node count: 5
+
+=== cp-node2 ===
+Mode: leader
+Node count: 5
+
+=== cp-node3 ===
+Mode: follower
+Node count: 5
+```
+
+```bash
+# Verifikasi quorum aktif menggunakan zookeeper-shell
+/usr/bin/zookeeper-shell cp-node1:2181 ls /brokers/ids
+```
+
+Output yang diharapkan:
+
+<img width="1018" height="167" alt="image" src="https://github.com/user-attachments/assets/c7b1f714-d305-4c0a-b8e3-653fe028a013" />
+
+```
+[1, 2, 3]
+```
+
+✅ **Ketiga broker terdaftar = ZooKeeper ensemble dan Kafka cluster sehat.**
+
+---
+
+### Test 4: Kafka Broker Health Check
+
+```bash
+# Cek daftar broker yang terdaftar di ZooKeeper
+/usr/bin/zookeeper-shell cp-node1:2181 ls /brokers/ids
+# Output: [1, 2, 3]
+```
+
+```bash
+# Cek detail setiap broker
+for id in 1 2 3; do
+  echo "=== Broker $id ==="
+  /usr/bin/zookeeper-shell cp-node1:2181 get /brokers/ids/$id
+  echo ""
+done
+```
+
+Output contoh untuk Broker 1:
+
+<img width="1870" height="644" alt="image" src="https://github.com/user-attachments/assets/1e16359a-d709-42ea-951b-b165e4336d9d" />
+
+```json
+{
+  "listener_security_protocol_map": {"INTERNAL":"PLAINTEXT","BROKER":"PLAINTEXT"},
+  "endpoints": ["INTERNAL://cp-node1:9092","BROKER://cp-node1:9091"],
+  "host": "cp-node1",
+  "port": 9092,
+  "version": 5
+}
+```
+
+```bash
+# Cek Kafka controller (broker yang menjadi cluster controller)
+/usr/bin/zookeeper-shell cp-node1:2181 get /controller
+# Output: {"version":2,"brokerid":2,...}
+```
+
+```bash
+# Cek list topic dari salah satu data node
+ssh cpadmin@cp-node1 "kafka-topics --bootstrap-server cp-node1:9092 --list"
+```
+<img width="963" height="177" alt="image" src="https://github.com/user-attachments/assets/d4ae4b1c-8632-48f1-b50d-97fa9f5422b0" />
+
+
+> **⚠️ Catatan:** `kafka-broker-api-versions` **tidak bisa dijalankan dari cp-ansible** karena cp-ansible tidak berada di dalam network internal Kafka. Jalankan Kafka CLI tools dari salah satu data node (cp-node1/2/3) melalui SSH.
+
+```bash
+# Cara yang benar: jalankan dari data node
+ssh cpadmin@cp-node1 "kafka-broker-api-versions --bootstrap-server cp-node1:9092 | head -20"
+```
+
+---
+
+### Test 5: Schema Registry Health Check
+
+```bash
+# Cek status Schema Registry
+curl -s http://cp-node1:8081/ | python3 -m json.tool
+# Output: {}  (response kosong adalah normal untuk endpoint root)
+```
+
+```bash
+# Cek konfigurasi compatibility mode
+curl -s http://cp-node1:8081/config | python3 -m json.tool
+```
+
+Output:
+
+<img width="1005" height="127" alt="image" src="https://github.com/user-attachments/assets/89bd542f-c98f-4482-9a16-c8aef3c22842" />
+
+```json
+{
+    "compatibilityLevel": "BACKWARD"
+}
+```
+
+```bash
+# Daftarkan schema string sederhana
+curl -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+  --data '{"schema": "{\"type\": \"string\"}"}' \
+  http://cp-node1:8081/subjects/test-string-value/versions
+# Output: {"id":1}
+```
+<img width="1555" height="134" alt="image" src="https://github.com/user-attachments/assets/0dd4b564-8ac2-40be-9cc1-dc0095e4ec6b" />
+
+
+> **Catatan:** Request pertama ke Schema Registry mungkin mengalami timeout singkat (`Register operation timed out`) saat Schema Registry pertama kali aktif. Ulangi request — biasanya berhasil di percobaan kedua.
+
+```bash
+# Daftarkan schema Avro kompleks (User record)
+curl -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+  --data '{
+    "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"},{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"email\",\"type\":\"string\"}]}"
+  }' \
+  http://cp-node1:8081/subjects/user-value/versions
+# Output: {"id":2}
+```
+
+```bash
+# Lihat semua subject yang terdaftar
+curl -s http://cp-node1:8081/subjects
+# Output: ["test-string-value","user-value"]
+
+# Lihat detail schema
+curl -s http://cp-node1:8081/subjects/user-value/versions/1 | python3 -m json.tool
+```
+
+```bash
+# Test backward compatibility — tambah field opsional (harus kompatibel)
+curl -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+  --data '{
+    "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"},{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"email\",\"type\":\"string\"},{\"name\":\"age\",\"type\":[\"null\",\"int\"],\"default\":null}]}"
+  }' \
+  http://cp-node1:8081/compatibility/subjects/user-value/versions/latest
+# Output: {"is_compatible":true}
+```
+<img width="1563" height="171" alt="image" src="https://github.com/user-attachments/assets/7dc37e81-3998-4fee-9440-d32719d7e787" />
+
+<img width="1559" height="424" alt="image" src="https://github.com/user-attachments/assets/d83bf013-a957-404a-8e84-9a5caf1581ac" />
+
+---
+
+### Test 6: Kafka Connect Health Check
+
+```bash
+# Cek status cluster Kafka Connect
+curl -s http://cp-node1:8083/ | python3 -m json.tool
+```
+
+Output:
+
+<img width="991" height="119" alt="image" src="https://github.com/user-attachments/assets/6a1edc95-c14c-49af-a16e-444093a0983c" />
+
+```json
+{
+    "version": "7.9.5-ce",
+    "commit": "21fdf52c487846be",
+    "kafka_cluster_id": "S8oRfvb0TfOTv6Txhg2g0g"
+}
+```
+
+```bash
+# Lihat semua connector plugins yang tersedia
+curl -s http://cp-node1:8083/connector-plugins | python3 -m json.tool
+```
+
+Output (default Confluent Platform tanpa tambahan plugin):
+
+<img width="1164" height="488" alt="image" src="https://github.com/user-attachments/assets/1c09be40-40f0-449e-bf29-811f82191a78" />
+
+```json
+[
+    {
+        "class": "io.confluent.connect.replicator.ReplicatorSourceConnector",
+        "type": "source",
+        "version": "7.9.5"
+    },
+    {
+        "class": "org.apache.kafka.connect.mirror.MirrorCheckpointConnector",
+        "type": "source",
+        "version": "7.9.5-ce"
+    },
+    {
+        "class": "org.apache.kafka.connect.mirror.MirrorHeartbeatConnector",
+        "type": "source",
+        "version": "7.9.5-ce"
+    },
+    {
+        "class": "org.apache.kafka.connect.mirror.MirrorSourceConnector",
+        "type": "source",
+        "version": "7.9.5-ce"
+    }
+]
+```
+
+> **Catatan:** `FileStreamSource` dan `FileStreamSink` **tidak tersedia** di Confluent Platform karena tidak disertakan dalam package `confluent-server`. Connector tersebut hanya ada di Apache Kafka open-source. Untuk pengujian connector, gunakan `MirrorSourceConnector` atau install connector tambahan via `confluent-hub`.
+
+```bash
+# Lihat semua connector yang sedang berjalan
+curl -s http://cp-node1:8083/connectors
+# Output: []
+```
+
+**Install connector tambahan (opsional) via confluent-hub:**
+
+```bash
+# Contoh install JDBC Connector
+ssh cpadmin@cp-node1
+confluent-hub install confluentinc/kafka-connect-jdbc:latest --no-prompt \
+  --component-dir /usr/share/confluent-hub-components
+
+# Restart Connect agar connector baru terdeteksi
+sudo systemctl restart confluent-kafka-connect
+```
+
+---
+
+### Test 7: ksqlDB Health Check
+
+```bash
+# Cek status ksqlDB server
+curl -s http://cp-node1:8088/info | python3 -m json.tool
+```
+<img width="994" height="267" alt="image" src="https://github.com/user-attachments/assets/e0a81dfd-7d3f-4543-85ff-2eacf2581a2e" />
+
+Output:
+
+```json
+{
+    "KsqlServerInfo": {
+        "version": "7.9.5",
+        "kafkaClusterId": "S8oRfvb0TfOTv6Txhg2g0g",
+        "ksqlServiceId": "confluent_ksql_",
+        "serverStatus": "RUNNING"
+    }
+}
+```
+
+> **Catatan:** CLI `ksql` **tidak tersedia di cp-ansible**. Jalankan ksqlDB CLI dari salah satu data node melalui SSH.
+
+```bash
+# Jalankan ksqlDB CLI dari data node
+ssh cpadmin@cp-node1 "ksql http://cp-node1:8088"
+```
+
+Di dalam ksqlDB CLI:
+
+```sql
+-- Lihat semua topic Kafka yang tersedia
+SHOW TOPICS;
+
+-- Lihat semua stream (kosong di awal)
+SHOW STREAMS;
+
+-- Lihat semua table (kosong di awal)
+SHOW TABLES;
+```
+<img width="1066" height="710" alt="image" src="https://github.com/user-attachments/assets/50aa4821-af8a-4c1c-92c6-e270b6f81699" />
+
+```bash
+# Alternatif: query ksqlDB via REST API tanpa CLI
+curl -X POST http://cp-node1:8088/ksql \
+  -H "Content-Type: application/vnd.ksql.v1+json; charset=utf-8" \
+  --data '{"ksql": "SHOW TOPICS;", "streamsProperties": {}}' | python3 -m json.tool
+```
+<img width="872" height="719" alt="image" src="https://github.com/user-attachments/assets/37c54aca-2be1-497e-a9ef-28e72b00ab2f" />
+
+---
+
+### Test 8: Kafka REST Proxy Health Check
+
+```bash
+# Cek status REST Proxy
+curl -s http://cp-node1:8082/ | python3 -m json.tool
+# Output: {}  (response kosong pada endpoint root adalah normal)
+```
+
+```bash
+# Lihat semua topic via REST API
+curl -s http://cp-node1:8082/topics | python3 -m json.tool
+```
+
+Output (akan berisi banyak internal topic Confluent):
+
+<img width="1116" height="705" alt="image" src="https://github.com/user-attachments/assets/636060aa-8d5c-4a83-a297-ce9959fddb98" />
+
+```json
+[
+    "_schemas",
+    "_confluent-metrics",
+    "_confluent-monitoring",
+    "connect-cluster-configs",
+    "connect-cluster-offsets",
+    "connect-cluster-status",
+    "_confluent-ksql-confluent_ksql__command_topic",
+    ...
+]
+```
+
+**Produce pesan JSON via REST API:**
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/vnd.kafka.json.v2+json" \
+  -H "Accept: application/vnd.kafka.v2+json" \
+  --data '{
+    "records": [
+      {"value": {"message": "Hello from REST!", "source": "rest-proxy"}},
+      {"value": {"message": "REST Proxy works!", "source": "rest-proxy"}}
+    ]
+  }' \
+  http://cp-node1:8082/topics/test-topic
+```
+
+Output sukses:
+<img width="1864" height="171" alt="image" src="https://github.com/user-attachments/assets/11464098-f7b8-4ed2-b055-b44696fd0a28" />
+
+```json
+{
+    "offsets": [
+        {"partition": 0, "offset": 0, "error_code": null, "error": null},
+        {"partition": 1, "offset": 0, "error_code": null, "error": null}
+    ],
+    "key_schema_id": null,
+    "value_schema_id": null
+}
+```
+
+**Produce pesan Avro via REST API + Schema Registry:**
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/vnd.kafka.avro.v2+json" \
+  -H "Accept: application/vnd.kafka.v2+json" \
+  --data '{
+    "value_schema": "{\"type\":\"record\",\"name\":\"Payment\",\"fields\":[{\"name\":\"amount\",\"type\":\"double\"},{\"name\":\"currency\",\"type\":\"string\"}]}",
+    "records": [
+      {"value": {"amount": 100.50, "currency": "USD"}},
+      {"value": {"amount": 250.00, "currency": "EUR"}}
+    ]
+  }' \
+  http://cp-node1:8082/topics/payments-avro
+```
+
+Output sukses (schema otomatis didaftarkan ke Schema Registry):
+
+<img width="1651" height="275" alt="image" src="https://github.com/user-attachments/assets/c08d2a57-9b69-4b14-bf5a-2429abd082ed" />
+
+```json
+{
+    "offsets": [
+        {"partition": 2, "offset": 0, "error_code": null, "error": null},
+        {"partition": 2, "offset": 1, "error_code": null, "error": null}
+    ],
+    "key_schema_id": null,
+    "value_schema_id": 3
+}
+```
+
+✅ **`value_schema_id: 3` menunjukkan schema Payment berhasil terdaftar ke Schema Registry.**
+
+**Consume pesan via REST API:**
+
+```bash
+# Langkah 1: Buat consumer instance
+curl -X POST \
+  -H "Content-Type: application/vnd.kafka.v2+json" \
+  --data '{"name": "rest-consumer-1", "format": "json", "auto.offset.reset": "earliest"}' \
+  http://cp-node1:8082/consumers/rest-consumer-group
+
+# Langkah 2: Subscribe ke topic
+curl -X POST \
+  -H "Content-Type: application/vnd.kafka.v2+json" \
+  --data '{"topics": ["test-topic"]}' \
+  http://cp-node1:8082/consumers/rest-consumer-group/instances/rest-consumer-1/subscription
+
+# Langkah 3: Consume records
+curl -X GET \
+  -H "Accept: application/vnd.kafka.json.v2+json" \
+  http://cp-node1:8082/consumers/rest-consumer-group/instances/rest-consumer-1/records
+
+# Langkah 4: Hapus consumer instance
+curl -X DELETE \
+  -H "Content-Type: application/vnd.kafka.v2+json" \
+  http://cp-node1:8082/consumers/rest-consumer-group/instances/rest-consumer-1
+```
+<img width="1692" height="407" alt="image" src="https://github.com/user-attachments/assets/81ff6740-3f8f-4609-a20d-fe78bc55cd4e" />
+
+
+---
+
+### Test 9: Control Center Health Check
+
+Control Center dapat diakses melalui browser:
+
+```
+http://192.168.56.10:9021
+```
+<img width="1411" height="933" alt="image" src="https://github.com/user-attachments/assets/088ee663-617c-4520-8fee-524f713e66f6" />
+
+```bash
+# Cek HTTP response dari cp-ansible
+curl -s -o /dev/null -w "%{http_code}" http://192.168.56.10:9021
+# Output: 200
+```
+
+**Dashboard Control Center menampilkan:**
+
+| Informasi | Nilai |
+|-----------|-------|
+| Brokers | 3 |
+| Partitions | 406+ |
+| Topics | 59+ |
+| ksqlDB clusters | 1 |
+| Connect clusters | 1 |
+
+> **Catatan:** Control Center mungkin menampilkan **"1 Unhealthy cluster"** saat pertama kali diakses. Ini normal — Control Center membutuhkan beberapa menit untuk mengumpulkan metrics dari semua komponen. Status akan berubah menjadi "Healthy" setelah data monitoring terkumpul.
+
+**Fitur yang dapat dicek di browser:**
+
+| URL | Fitur |
+|-----|-------|
+| `http://192.168.56.10:9021` | Dashboard utama |
+| `http://192.168.56.10:9021/#/clusters` | Daftar cluster Kafka |
+| `http://192.168.56.10:9021/#/topics` | Topic explorer |
+| `http://192.168.56.10:9021/#/connect` | Kafka Connect management |
+| `http://192.168.56.10:9021/#/ksql` | ksqlDB query editor |
+| `http://192.168.56.10:9021/#/consumers` | Consumer group monitoring |
+
+---
+
+### Test 10: End-to-End Pipeline Test
+
+Test ini membuktikan seluruh stack berfungsi bersama: data masuk via REST Proxy → diproses ksqlDB → dikonsumsi via kafka-console-consumer.
+
+**Langkah 1:** Buat topic:
+
+```bash
+ssh cpadmin@cp-node1 "kafka-topics --bootstrap-server cp-node1:9092 \
+  --create --topic orders-raw \
+  --partitions 3 --replication-factor 3"
+
+ssh cpadmin@cp-node1 "kafka-topics --bootstrap-server cp-node1:9092 \
+  --create --topic orders-premium \
+  --partitions 3 --replication-factor 3"
+```
+
+**Langkah 2:** Buat stream ksqlDB (dari cp-node1 via SSH):
+
+```bash
+ssh cpadmin@cp-node1 "ksql http://cp-node1:8088 <<'EOF'
+CREATE STREAM orders_raw (
+  order_id VARCHAR,
+  customer VARCHAR,
+  amount DOUBLE,
+  status VARCHAR
+) WITH (
+  KAFKA_TOPIC = 'orders-raw',
+  VALUE_FORMAT = 'JSON'
+);
+
+CREATE STREAM orders_premium AS
+  SELECT order_id, customer, amount, status
+  FROM orders_raw
+  WHERE amount > 1000
+  EMIT CHANGES;
+EOF"
+```
+
+**Langkah 3:** Kirim data via REST Proxy (dari cp-ansible):
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/vnd.kafka.json.v2+json" \
+  --data '{
+    "records": [
+      {"value": {"order_id": "ORD-001", "customer": "Alice", "amount": 500, "status": "pending"}},
+      {"value": {"order_id": "ORD-002", "customer": "Bob", "amount": 1500, "status": "pending"}},
+      {"value": {"order_id": "ORD-003", "customer": "Charlie", "amount": 250, "status": "pending"}},
+      {"value": {"order_id": "ORD-004", "customer": "Diana", "amount": 2000, "status": "pending"}}
+    ]
+  }' \
+  http://cp-node1:8082/topics/orders-raw
+```
+
+**Langkah 4:** Konsumsi hanya order premium (dari cp-node1):
+
+```bash
+ssh cpadmin@cp-node1 "kafka-console-consumer \
+  --bootstrap-server cp-node1:9092 \
+  --topic ORDERS_PREMIUM \
+  --from-beginning \
+  --timeout-ms 5000"
+```
+
+Output yang diharapkan:
+
+```json
+{"ORDER_ID":"ORD-002","CUSTOMER":"Bob","AMOUNT":1500.0,"STATUS":"pending"}
+{"ORDER_ID":"ORD-004","CUSTOMER":"Diana","AMOUNT":2000.0,"STATUS":"pending"}
+```
+
+✅ **Hanya 2 record (amount > 1000) muncul — pipeline REST Proxy → Kafka → ksqlDB → Consumer berfungsi.**
+
+---
+
+### Test 11: Schema Evolution Test
+
+```bash
+# Schema v1: User dengan 2 field
+curl -X POST \
+  -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+  --data '{"schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"},{\"name\":\"name\",\"type\":\"string\"}]}"}' \
+  http://cp-node1:8081/subjects/users-value/versions
+# Output: {"id":4}
+
+# Schema v2: tambah field opsional (BACKWARD COMPATIBLE)
+curl -X POST \
+  -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+  --data '{"schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"},{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"email\",\"type\":[\"null\",\"string\"],\"default\":null}]}"}' \
+  http://cp-node1:8081/subjects/users-value/versions
+# Output: {"id":5} — berhasil karena backward compatible
+
+# Schema v3: hapus field yang ada (BREAKING CHANGE — harus ditolak)
+curl -X POST \
+  -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+  --data '{"schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]}"}' \
+  http://cp-node1:8081/subjects/users-value/versions
+# Output: HTTP 409 — Schema ditolak karena tidak backward compatible
+```
+
+---
+
+### Test 12: Fault Tolerance — Node Down Test
+
+**Langkah 1:** Hentikan semua service di cp-node3:
+
+```bash
+ssh cpadmin@cp-node3 "sudo systemctl stop \
+  confluent-kafka-rest \
+  confluent-ksqldb \
+  confluent-kafka-connect \
+  confluent-schema-registry \
+  confluent-server \
+  confluent-zookeeper"
+```
+
+**Langkah 2:** Verifikasi cluster masih beroperasi (quorum 2 dari 3 node):
+
+```bash
+# ZooKeeper masih quorum?
+echo "srvr" | nc cp-node1 2181 | grep Mode
+
+# Kafka masih bisa list topic?
+ssh cpadmin@cp-node1 "kafka-topics --bootstrap-server cp-node1:9092 --list"
+
+# Schema Registry masih merespons?
+curl -s http://cp-node1:8081/subjects
+
+# Produce pesan saat 1 node down
+ssh cpadmin@cp-node1 "echo 'Message while cp-node3 is down' | \
+  kafka-console-producer --bootstrap-server cp-node1:9092 --topic test-topic"
+```
+
+✅ **Semua operasi masih berfungsi karena quorum masih terpenuhi (2 dari 3 node aktif).**
+
+**Langkah 3:** Hidupkan kembali cp-node3:
+
+```bash
+# ZooKeeper harus start pertama
+ssh cpadmin@cp-node3 "sudo systemctl start confluent-zookeeper"
+sleep 15  # Tunggu join ensemble
+
+# Kafka broker
+ssh cpadmin@cp-node3 "sudo systemctl start confluent-server"
+sleep 30  # Tunggu rejoin dan replica sync
+
+# Komponen lainnya
+ssh cpadmin@cp-node3 "sudo systemctl start \
+  confluent-schema-registry \
+  confluent-kafka-connect \
+  confluent-ksqldb \
+  confluent-kafka-rest"
+```
+
+**Langkah 4:** Verifikasi cp-node3 rejoin:
+
+```bash
+# ZooKeeper ensemble kembali 3 node?
+echo "srvr" | nc cp-node3 2181 | grep Mode
+
+# Kafka broker IDs kembali [1,2,3]?
+/usr/bin/zookeeper-shell cp-node1:2181 ls /brokers/ids
+```
+
+---
+
+### Checklist Verifikasi Lengkap
+
+```
+DEPLOYMENT
+[ ] ansible-playbook berhasil: failed=0, unreachable=0 untuk semua node
+[ ] Semua 8 play selesai tanpa error
+
+ZOOKEEPER
+[ ] confluent-zookeeper: active (running) di cp-node1, cp-node2, cp-node3
+[ ] echo srvr | nc <node> 2181 → menampilkan Mode dan Node count
+[ ] 1 node Mode: leader, 2 node Mode: follower
+[ ] Port 2181 LISTEN di semua node, port 2888 di leader, 3888 di semua node
+[ ] quorumListenOnAllIPs=true di zookeeper.properties (fix deployment ini)
+
+KAFKA BROKER
+[ ] confluent-server: active (running) di cp-node1, cp-node2, cp-node3
+[ ] Broker IDs terdaftar: [1, 2, 3] via zookeeper-shell
+[ ] Port 9092 LISTEN di semua node
+[ ] Kafka CLI dapat dijalankan dari salah satu data node
+
+SCHEMA REGISTRY
+[ ] confluent-schema-registry: active (running) di semua node
+[ ] Port 8081 LISTEN dan merespons
+[ ] curl /config → compatibilityLevel: BACKWARD
+[ ] Schema dapat didaftarkan via REST API
+[ ] Schema evolution (BACKWARD compatibility) berfungsi
+[ ] Avro schema terdaftar otomatis saat produce via REST Proxy
+
+KAFKA CONNECT
+[ ] confluent-kafka-connect: active (running) di semua node
+[ ] Port 8083 LISTEN, curl / → version 7.9.5-ce
+[ ] Internal topics (connect-cluster-configs/offsets/status) tersedia
+[ ] 4 connector plugins tersedia (Replicator, MirrorMaker2 x3)
+
+KSQLDB
+[ ] confluent-ksqldb: active (running) di semua node
+[ ] Port 8088 LISTEN, curl /info → serverStatus: RUNNING
+[ ] ksqlDB CLI dapat diakses dari data node
+[ ] REST API query (SHOW TOPICS) berfungsi
+
+REST PROXY
+[ ] confluent-kafka-rest: active (running) di semua node
+[ ] Port 8082 LISTEN
+[ ] curl /topics → daftar topic tersedia
+[ ] Produce JSON berhasil
+[ ] Produce Avro berhasil (value_schema_id terdaftar di Schema Registry)
+[ ] Consume via REST API berhasil
+
+CONTROL CENTER
+[ ] confluent-control-center: active (running) di cp-ansible
+[ ] Port 9021 LISTEN, curl → HTTP 200
+[ ] Web UI dapat diakses di http://192.168.56.10:9021
+[ ] Cluster terdeteksi: 3 brokers, 59+ topics
+[ ] ksqlDB clusters: 1, Connect clusters: 1
+
+END-TO-END
+[ ] Pipeline: REST Proxy → Kafka → ksqlDB filter → Consumer berfungsi
+[ ] Fault tolerance: cluster berfungsi saat 1 node down
+[ ] Recovery: semua service rejoin setelah node dinyalakan kembali
+```
