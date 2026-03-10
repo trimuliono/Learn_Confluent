@@ -482,13 +482,17 @@ Verification: OK
 Buat file konfigurasi client:
 
 ```bash
+# Copy truststore ke tempat yang bisa diakses cpadmin
+sudo cp /var/ssl/private/kafka_broker.truststore.jks ~/
+sudo chown cpadmin:cpadmin ~/kafka_broker.truststore.jks
+
 cat > ~/client.properties << EOF
 security.protocol=SASL_SSL
 sasl.mechanism=PLAIN
 sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required \
   username="admin" \
   password="admin-secret";
-ssl.truststore.location=/var/ssl/private/kafka_broker.truststore.jks
+ssl.truststore.location=/home/cpadmin/kafka_broker.truststore.jks
 ssl.truststore.password=confluenttruststorepass
 EOF
 ```
@@ -501,6 +505,7 @@ kafka-console-producer \
   --topic secure-topic \
   --producer.config ~/client.properties
 ```
+<img width="1098" height="646" alt="image" src="https://github.com/user-attachments/assets/34d4f8ff-3bbc-44b2-9a93-9be525ea206d" />
 
 **Test Consume:**
 
@@ -511,6 +516,7 @@ kafka-console-consumer \
   --from-beginning \
   --consumer.config ~/client.properties
 ```
+<img width="1100" height="642" alt="image" src="https://github.com/user-attachments/assets/e9a08ef7-f2f0-4f80-8fb4-48cce50e6554" />
 
 ---
 
@@ -528,6 +534,7 @@ kafka-acls \
   --operation Write \
   --topic connect-cluster-configs
 ```
+<img width="971" height="717" alt="image" src="https://github.com/user-attachments/assets/a81aac8c-b709-4e6f-907a-8ca88a0f0c86" />
 
 Verifikasi ACL:
 
@@ -538,23 +545,42 @@ kafka-acls \
   --list \
   --topic connect-cluster-configs
 ```
+<img width="978" height="642" alt="image" src="https://github.com/user-attachments/assets/4838e245-ba72-449c-a930-db4639fa62b3" />
 
 ---
 
 ### Test 4: Unauthorized Access
 
-Coba akses tanpa credential — harus ditolak:
+Coba akses wrong credential:
 
 ```bash
+cat > ~/wrong.properties << EOF
+security.protocol=SASL_SSL
+sasl.mechanism=PLAIN
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required \
+  username="hacker" \
+  password="wrongpassword";
+ssl.truststore.location=/home/cpadmin/kafka_broker.truststore.jks
+ssl.truststore.password=confluenttruststorepass
+EOF
+
 kafka-console-consumer \
   --bootstrap-server cp-node1:9092 \
-  --topic secure-topic
+  --topic secure-topic \
+  --from-beginning \
+  --consumer.config ~/wrong.properties
 ```
+<img width="1279" height="456" alt="image" src="https://github.com/user-attachments/assets/cb789160-cfac-4647-8eae-6905b7f8c080" />
 
 Output yang diharapkan:
 ```
 ERROR Error processing message, terminating consumer process:
 org.apache.kafka.common.errors.SaslAuthenticationException: SASL authentication failed
+
+atau
+Processed a total of 0 messages
+
+0 karena tidak memiliki akses
 ```
 
 ---
