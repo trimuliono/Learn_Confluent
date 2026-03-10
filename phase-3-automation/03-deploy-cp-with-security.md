@@ -567,6 +567,8 @@ Akses via browser:
 https://192.168.56.10:9021
 ```
 
+<img width="1897" height="959" alt="image" src="https://github.com/user-attachments/assets/da66d833-ba8a-4747-bf39-8aeea1c95832" />
+
 > **Catatan:** Browser akan menampilkan warning "Not Secure" atau "Your connection is not private" karena menggunakan self-signed certificate. Ini normal — klik **Advanced → Proceed to 192.168.56.10**.
 
 Verifikasi tampilan Control Center:
