@@ -104,7 +104,6 @@ phase-2-security/
 * Automated deployment (non-secure)
 * Automated secure deployment
 * Secret management using Ansible Vault
-* Monitoring integration
 * Troubleshooting scenarios
 
 📂 Location:
@@ -113,10 +112,7 @@ phase-2-security/
 phase-3-automation/
 ├── 01-install-ansible-on-ansible-control-node.md
 ├── 02-deploy-cp-no-security.md
-├── 03-deploy-cp-secure.md
-├── 04-ansible-vault.md
-├── 05-monitoring.md
-└── 06-troubleshooting-scenarios.md
+└── 03-deploy-cp-with-security.md
 ```
 
 ---
